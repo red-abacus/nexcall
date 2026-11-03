@@ -1,0 +1,235 @@
+name: Deploy web GKE Prod
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  APP_NAME: nexcall-ui
+  APP_PATH: apps/web
+  APP_BASE_URL: ${{ vars.WEB_APP_BASE_URL || 'nexcall.abac.software' }}
+  HELM_CHART_PATH: apps/web/deploy/helm/nexcall-ui
+  HELM_VALUES_FILE: apps/web/deploy/helm/nexcall-ui/values.prod.yaml
+  WIF_PROVIDER: projects/230090696757/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+  WIF_SERVICE_ACCOUNT_EMAIL: github-actions-sa@abac-gke.iam.gserviceaccount.com
+  GCP_PROJECT_ID: abac-gke
+  GCP_REGION: europe-west1
+  GKE_CLUSTER: abac-infrastructure
+  GKE_LOCATION: europe-west1-b
+  INGRESS_CLASS_NAME: ${{ vars.INGRESS_CLASS_NAME || 'nginx' }}
+  DEPLOY_TIMEOUT: 10m
+  NODE_VERSION: "22"
+  NODE_OPTIONS: --openssl-legacy-provider
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_READ_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci --legacy-peer-deps
+
+      - name: Run lint
+        working-directory: apps/web
+        run: npm run lint
+
+      - name: Build production UI
+        working-directory: apps/web
+        run: npm run build-prod
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint chart
+        run: helm lint "$HELM_CHART_PATH" -f "$HELM_VALUES_FILE" --set image.repository=example.com/nexcall-ui --set image.tag=ci
+
+      - name: Render chart
+        run: helm template "$APP_NAME" "$HELM_CHART_PATH" -f "$HELM_VALUES_FILE" --set image.repository=example.com/nexcall-ui --set image.tag=ci >/dev/null
+
+  build_push:
+    runs-on: ubuntu-latest
+    needs: check
+    outputs:
+      image_repository: ${{ steps.meta.outputs.image_repository }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_READ_TOKEN }}
+
+      - name: Initialize derived environment
+        run: |
+          echo "GAR_REPO=$APP_NAME" >> "$GITHUB_ENV"
+          echo "HELM_RELEASE=$APP_NAME" >> "$GITHUB_ENV"
+          echo "K8S_NAMESPACE=$APP_NAME" >> "$GITHUB_ENV"
+
+      - name: Validate required variables
+        run: |
+          set -euo pipefail
+          test -n "${APP_BASE_URL}"
+          test -n "${GCP_PROJECT_ID}"
+          test -n "${GCP_REGION}"
+          test -n "${GAR_REPO}"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Ensure Artifact Registry repository exists
+        run: |
+          set -euo pipefail
+          if gcloud artifacts repositories describe "$GAR_REPO" \
+            --location "$GCP_REGION" \
+            --project "$GCP_PROJECT_ID" >/dev/null 2>&1; then
+            echo "Artifact Registry repository $GAR_REPO already exists"
+          else
+            gcloud artifacts repositories create "$GAR_REPO" \
+              --repository-format docker \
+              --location "$GCP_REGION" \
+              --description "$APP_NAME Docker images" \
+              --project "$GCP_PROJECT_ID"
+          fi
+
+      - name: Configure Docker auth for GAR
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          IMAGE_REPOSITORY="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GAR_REPO}/${APP_NAME}"
+          IMAGE_TAG="${GITHUB_SHA}"
+          echo "image_repository=${IMAGE_REPOSITORY}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${{ steps.meta.outputs.image_repository }}:${{ steps.meta.outputs.image_tag }}"
+          docker build -t "$IMAGE_URI" "./${APP_PATH}"
+          docker push "$IMAGE_URI"
+
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build_push
+    environment: non-prod
+    outputs:
+      release_name: ${{ steps.deploy.outputs.release_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_READ_TOKEN }}
+
+      - name: Initialize derived environment
+        run: |
+          echo "GAR_REPO=$APP_NAME" >> "$GITHUB_ENV"
+          echo "HELM_RELEASE=$APP_NAME" >> "$GITHUB_ENV"
+          echo "K8S_NAMESPACE=$APP_NAME" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_LOCATION }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Ensure namespace exists
+        run: |
+          set -euo pipefail
+          if kubectl get namespace "$K8S_NAMESPACE" >/dev/null 2>&1; then
+            echo "Namespace $K8S_NAMESPACE already exists"
+          else
+            kubectl create namespace "$K8S_NAMESPACE"
+          fi
+
+      - name: Deploy with Helm
+        id: deploy
+        run: |
+          set -euo pipefail
+          RELEASE_NAME="${HELM_RELEASE:-$APP_NAME}"
+          if ! helm upgrade --install "$RELEASE_NAME" "$HELM_CHART_PATH" \
+            --namespace "$K8S_NAMESPACE" \
+            --values "$HELM_VALUES_FILE" \
+            --set image.repository="${{ needs.build_push.outputs.image_repository }}" \
+            --set image.tag="${{ needs.build_push.outputs.image_tag }}" \
+            --set app.baseUrl="$APP_BASE_URL" \
+            --set ingress.className="$INGRESS_CLASS_NAME" \
+            --wait \
+            --timeout "$DEPLOY_TIMEOUT" \
+            --atomic; then
+            kubectl get pods --namespace "$K8S_NAMESPACE" -o wide
+            kubectl get events --namespace "$K8S_NAMESPACE" --sort-by=.lastTimestamp
+            exit 1
+          fi
+          echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
+
+  post_deploy_smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: deploy
+    if: ${{ needs.deploy.result == 'success' }}
+    steps:
+      - name: Initialize derived environment
+        run: |
+          echo "HELM_RELEASE=$APP_NAME" >> "$GITHUB_ENV"
+          echo "K8S_NAMESPACE=$APP_NAME" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_LOCATION }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Validate rollout
+        run: kubectl -n "$K8S_NAMESPACE" rollout status deployment/"${{ needs.deploy.outputs.release_name }}" --timeout="$DEPLOY_TIMEOUT"
+
+      - name: Run Helm smoke test
+        run: helm test "${{ needs.deploy.outputs.release_name }}" --namespace "$K8S_NAMESPACE" --timeout 5m --logs

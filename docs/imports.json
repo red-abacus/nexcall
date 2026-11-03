@@ -1,0 +1,25 @@
+{
+  "importDate": "2026-11-02",
+  "method": "Git submodules pinned to the original imported commits; each app retains its own full Git history and origin remote.",
+  "sources": [
+    {
+      "path": "apps/web",
+      "repository": "git@github.com:red-abacus/nexcall-web.git",
+      "branch": "master",
+      "commit": "498b13ac82d0ea10016c795b6f8086686a0c649b"
+    },
+    {
+      "path": "apps/api",
+      "repository": "git@github.com:red-abacus/nexcall-api.git",
+      "branch": "master",
+      "commit": "56739917db8aec8bd60f34821e4cda367b6bef6a"
+    },
+    {
+      "path": "apps/mobile",
+      "repository": "git@github.com:red-abacus/nexcall-mobile.git",
+      "branch": "master",
+      "commit": "920192c668fc7df621f8a5a8820de1327a2ccdf5"
+    }
+  ],
+  "submoduleConversionDate": "2026-11-03"
+}

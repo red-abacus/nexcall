@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -lt 2 ]; then
+  echo 'Usage: scripts/run <web|api|mobile> <command> [args...]' >&2
+  exit 2
+fi
+
+app_name=$1
+shift
+case "$app_name" in
+  web|api|mobile) ;;
+  *) echo "Unknown application: $app_name" >&2; exit 2 ;;
+esac
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repo_root/apps/$app_name"
+exec "$@"

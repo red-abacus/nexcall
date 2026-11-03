@@ -1,0 +1,12 @@
+[submodule "apps/web"]
+	path = apps/web
+	url = git@github.com:red-abacus/nexcall-web.git
+	branch = master
+[submodule "apps/api"]
+	path = apps/api
+	url = git@github.com:red-abacus/nexcall-api.git
+	branch = master
+[submodule "apps/mobile"]
+	path = apps/mobile
+	url = git@github.com:red-abacus/nexcall-mobile.git
+	branch = master

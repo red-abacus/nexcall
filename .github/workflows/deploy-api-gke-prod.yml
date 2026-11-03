@@ -1,0 +1,313 @@
+name: Deploy api GKE Prod
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  APP_NAME: nexcall-api
+  APP_PATH: apps/api
+  APP_BASE_URL: ${{ vars.API_APP_BASE_URL }}
+  HELM_CHART_PATH: apps/api/deploy/helm/nexcall-api
+  HELM_VALUES_FILE: apps/api/deploy/helm/nexcall-api/values.prod.yaml
+  WIF_PROVIDER: projects/230090696757/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+  WIF_SERVICE_ACCOUNT_EMAIL: github-actions-sa@abac-gke.iam.gserviceaccount.com
+  GCP_PROJECT_ID: abac-gke
+  GCP_REGION: europe-west1
+  GKE_CLUSTER: abac-infrastructure
+  GKE_LOCATION: europe-west1-b
+  INGRESS_CLASS_NAME: ${{ vars.INGRESS_CLASS_NAME || 'nginx' }}
+  DEPLOY_TIMEOUT: 10m
+  JAVA_VERSION: "25"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_READ_TOKEN }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run tests
+        working-directory: apps/api
+        run: ./gradlew clean test
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint chart
+        run: helm lint "$HELM_CHART_PATH" -f "$HELM_VALUES_FILE" --set image.repository=example.com/nexcall-api --set image.tag=ci
+
+      - name: Render chart
+        run: helm template "$APP_NAME" "$HELM_CHART_PATH" -f "$HELM_VALUES_FILE" --set image.repository=example.com/nexcall-api --set image.tag=ci >/dev/null
+
+  build_push:
+    runs-on: ubuntu-latest
+    needs: check
+    outputs:
+      image_repository: ${{ steps.meta.outputs.image_repository }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_READ_TOKEN }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Initialize derived environment
+        run: |
+          echo "GAR_REPO=$APP_NAME" >> "$GITHUB_ENV"
+          echo "HELM_RELEASE=$APP_NAME" >> "$GITHUB_ENV"
+          echo "K8S_NAMESPACE=$APP_NAME" >> "$GITHUB_ENV"
+          echo "FIREBASE_ENABLED=false" >> "$GITHUB_ENV"
+
+      - name: Validate required variables
+        run: |
+          set -euo pipefail
+          test -n "${APP_BASE_URL}"
+          test -n "${GCP_PROJECT_ID}"
+          test -n "${GCP_REGION}"
+          test -n "${GAR_REPO}"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Ensure Artifact Registry repository exists
+        run: |
+          set -euo pipefail
+          if gcloud artifacts repositories describe "$GAR_REPO" \
+            --location "$GCP_REGION" \
+            --project "$GCP_PROJECT_ID" >/dev/null 2>&1; then
+            echo "Artifact Registry repository $GAR_REPO already exists"
+          else
+            gcloud artifacts repositories create "$GAR_REPO" \
+              --repository-format docker \
+              --location "$GCP_REGION" \
+              --description "$APP_NAME Docker images" \
+              --project "$GCP_PROJECT_ID"
+          fi
+
+      - name: Configure Docker auth for GAR
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build monolith jar
+        working-directory: apps/api
+        run: ./gradlew clean bootJar -x test
+
+      - name: Build metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          IMAGE_REPOSITORY="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GAR_REPO}/${APP_NAME}"
+          IMAGE_TAG="${GITHUB_SHA}"
+          echo "image_repository=${IMAGE_REPOSITORY}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${{ steps.meta.outputs.image_repository }}:${{ steps.meta.outputs.image_tag }}"
+          docker build --build-arg JAR_FILE=build/libs/monolith-0.0.1-SNAPSHOT.jar -t "$IMAGE_URI" "./${APP_PATH}"
+          docker push "$IMAGE_URI"
+
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build_push
+    environment: non-prod
+    outputs:
+      release_name: ${{ steps.deploy.outputs.release_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_READ_TOKEN }}
+
+      - name: Initialize derived environment
+        run: |
+          echo "GAR_REPO=$APP_NAME" >> "$GITHUB_ENV"
+          echo "HELM_RELEASE=$APP_NAME" >> "$GITHUB_ENV"
+          echo "K8S_NAMESPACE=$APP_NAME" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_LOCATION }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Ensure namespace exists
+        run: |
+          set -euo pipefail
+          if kubectl get namespace "$K8S_NAMESPACE" >/dev/null 2>&1; then
+            echo "Namespace $K8S_NAMESPACE already exists"
+          else
+            kubectl create namespace "$K8S_NAMESPACE"
+          fi
+
+      - name: Apply MySQL secret
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_APPLICATION_USER: ${{ secrets.MYSQL_APPLICATION_USER }}
+          MYSQL_APPLICATION_PASSWORD: ${{ secrets.MYSQL_APPLICATION_PASSWORD }}
+        run: |
+          kubectl create secret generic "$HELM_RELEASE-mysql-secret" \
+            --namespace "$K8S_NAMESPACE" \
+            --from-literal=root-password="$MYSQL_ROOT_PASSWORD" \
+            --from-literal=application-user="$MYSQL_APPLICATION_USER" \
+            --from-literal=application-password="$MYSQL_APPLICATION_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply application secret
+        env:
+          NEXCALL_JWT_AUTH_TOKEN_SECRET: ${{ secrets.NEXCALL_JWT_AUTH_TOKEN_SECRET }}
+          NEXCALL_JWT_CONFIRMATION_ACCOUNT_SECRET: ${{ secrets.NEXCALL_JWT_CONFIRMATION_ACCOUNT_SECRET }}
+          NEXCALL_JWT_RESET_PASSWORD_SECRET: ${{ secrets.NEXCALL_JWT_RESET_PASSWORD_SECRET }}
+          NEXCALL_SENDGRID_KEY: ${{ secrets.NEXCALL_SENDGRID_KEY }}
+          NEXCALL_AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.NEXCALL_AZURE_STORAGE_CONNECTION_STRING }}
+          NEXCALL_TWILIO_ACCOUNT_SID: ${{ secrets.NEXCALL_TWILIO_ACCOUNT_SID }}
+          NEXCALL_TWILIO_API_SECRET: ${{ secrets.NEXCALL_TWILIO_API_SECRET }}
+          NEXCALL_TWILIO_API_KEY: ${{ secrets.NEXCALL_TWILIO_API_KEY }}
+          NEXCALL_TWILIO_AUTH_TOKEN: ${{ secrets.NEXCALL_TWILIO_AUTH_TOKEN }}
+          NEXCALL_TWILIO_OUTGOING_APPLICATION_SID: ${{ secrets.NEXCALL_TWILIO_OUTGOING_APPLICATION_SID }}
+          NEXCALL_TWILIO_ANDROID_PUSH_CREDENTIALS_SID: ${{ secrets.NEXCALL_TWILIO_ANDROID_PUSH_CREDENTIALS_SID }}
+          NEXCALL_TWILIO_IOS_PUSH_CREDENTIALS_SID: ${{ secrets.NEXCALL_TWILIO_IOS_PUSH_CREDENTIALS_SID }}
+        run: |
+          kubectl create secret generic "$HELM_RELEASE-app-secrets" \
+            --namespace "$K8S_NAMESPACE" \
+            --from-literal=jwt-auth-token-secret="$NEXCALL_JWT_AUTH_TOKEN_SECRET" \
+            --from-literal=jwt-confirmation-account-secret="$NEXCALL_JWT_CONFIRMATION_ACCOUNT_SECRET" \
+            --from-literal=jwt-reset-password-secret="$NEXCALL_JWT_RESET_PASSWORD_SECRET" \
+            --from-literal=sendgrid-key="$NEXCALL_SENDGRID_KEY" \
+            --from-literal=azure-storage-connection-string="$NEXCALL_AZURE_STORAGE_CONNECTION_STRING" \
+            --from-literal=twilio-account-sid="$NEXCALL_TWILIO_ACCOUNT_SID" \
+            --from-literal=twilio-api-secret="$NEXCALL_TWILIO_API_SECRET" \
+            --from-literal=twilio-api-key="$NEXCALL_TWILIO_API_KEY" \
+            --from-literal=twilio-auth-token="$NEXCALL_TWILIO_AUTH_TOKEN" \
+            --from-literal=twilio-outgoing-application-sid="$NEXCALL_TWILIO_OUTGOING_APPLICATION_SID" \
+            --from-literal=twilio-android-push-credentials-sid="$NEXCALL_TWILIO_ANDROID_PUSH_CREDENTIALS_SID" \
+            --from-literal=twilio-ios-push-credentials-sid="$NEXCALL_TWILIO_IOS_PUSH_CREDENTIALS_SID" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply Firebase service account
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "FIREBASE_SERVICE_ACCOUNT_JSON is not set; skipping Firebase secret creation"
+            echo "FIREBASE_ENABLED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > firebase-service-account.json
+          kubectl create secret generic "$HELM_RELEASE-firebase" \
+            --namespace "$K8S_NAMESPACE" \
+            --from-file=firebase-service-account.json=firebase-service-account.json \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "FIREBASE_ENABLED=true" >> "$GITHUB_ENV"
+
+      - name: Deploy with Helm
+        id: deploy
+        run: |
+          set -euo pipefail
+          RELEASE_NAME="${HELM_RELEASE:-$APP_NAME}"
+          if ! helm upgrade --install "$RELEASE_NAME" "$HELM_CHART_PATH" \
+            --namespace "$K8S_NAMESPACE" \
+            --values "$HELM_VALUES_FILE" \
+            --set image.repository="${{ needs.build_push.outputs.image_repository }}" \
+            --set image.tag="${{ needs.build_push.outputs.image_tag }}" \
+            --set app.baseUrl="$APP_BASE_URL" \
+            --set ingress.className="$INGRESS_CLASS_NAME" \
+            --set appSecrets.name="$HELM_RELEASE-app-secrets" \
+            --set mysql.secretName="$HELM_RELEASE-mysql-secret" \
+            --set firebase.secretName="$HELM_RELEASE-firebase" \
+            --set firebase.enabled="$FIREBASE_ENABLED" \
+            --wait \
+            --timeout "$DEPLOY_TIMEOUT" \
+            --atomic; then
+            kubectl get pods --namespace "$K8S_NAMESPACE" -o wide
+            kubectl get events --namespace "$K8S_NAMESPACE" --sort-by=.lastTimestamp
+            exit 1
+          fi
+          echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
+
+  post_deploy_smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: deploy
+    if: ${{ needs.deploy.result == 'success' }}
+    steps:
+      - name: Initialize derived environment
+        run: |
+          set -euo pipefail
+          RELEASE_NAME="${{ needs.deploy.outputs.release_name }}"
+          if [ -z "$RELEASE_NAME" ]; then
+            RELEASE_NAME="$APP_NAME"
+          fi
+          echo "HELM_RELEASE=$RELEASE_NAME" >> "$GITHUB_ENV"
+          echo "K8S_NAMESPACE=$APP_NAME" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_LOCATION }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Validate rollout
+        run: kubectl -n "$K8S_NAMESPACE" rollout status deployment/"$HELM_RELEASE" --timeout="$DEPLOY_TIMEOUT"
+
+      - name: Run Helm smoke test
+        run: helm test "$HELM_RELEASE" --namespace "$K8S_NAMESPACE" --timeout 5m --logs

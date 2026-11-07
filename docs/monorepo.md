@@ -53,7 +53,7 @@ Run Git commands in the application's directory. Before making development commi
 
 ## Local commands and IDE
 
-The root `.run` configurations continue to target `apps/web/package.json`. Use Node 22.23.2, run **UI - Install dependencies** on a new checkout, then **UI - Local**. Existing installed dependencies were retained during conversion.
+The root `.idea/runConfigurations` configurations continue to target `apps/web/package.json`. Use Node 22.23.2, run **UI - Install dependencies** on a new checkout, then **UI - Local**. Existing installed dependencies were retained during conversion.
 
 The launcher changes to the selected app directory and preserves arguments and exit status:
 

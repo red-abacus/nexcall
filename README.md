@@ -32,10 +32,16 @@ See [monorepo operations](docs/monorepo.md) for builds, deployment workflows and
 
 ## IDE run configurations
 
-Open the monorepo root in IntelliJ IDEA or WebStorm. Shared configurations in `.run` target `apps/web/package.json`:
+Open the monorepo root in IntelliJ IDEA or WebStorm. Shared configurations in `.idea/runConfigurations` target `apps/web/package.json`:
 
 - **UI - Install dependencies**: runs `npm ci` using the web workspace's `.npmrc` and lockfile.
 - **UI - Local**: runs `npm start` with the default local environment.
 - **UI - Dev**, **UI - Staging**, **UI - Prod**: run the existing environment-specific serve scripts.
 
 Set the IDE project Node.js interpreter to the version in `apps/web/.nvmrc` (currently **22.23.2**). Run **UI - Install dependencies** once, then **UI - Local** and open `http://localhost:4200/`. All serve configurations use port 4200, so run one at a time. Named environments retain their existing API endpoints and mock settings. JavaScript/Node.js support must be enabled in the IDE.
+
+### UI feature variants
+
+Select **UI - Dev** for real login, CRM and Twilio inventory APIs. Their configuration uses `features.crm` and `features.twilioNumbers`, each with independent `enabled` and `mocked` booleans.
+
+Select **UI - Mocked**, or run `./scripts/run web npm run start-mocked`, for the CRM, Settings number inventory, campaign, tenant and dashboard fixtures. It also uses real login and user profiles: sign in with your normal credentials, not demo credentials. Both variants run on `http://localhost:4200`; run one at a time. See the [web build guide](apps/web/docs/build-and-run.md) for the toggle matrix and remaining prototype limitations.

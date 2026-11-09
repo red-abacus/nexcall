@@ -321,9 +321,8 @@ The backend owns callback date validation and queue ordering. Pending callback d
 
 Replay is removed from campaign details. Administrators and tenant administrators can duplicate a campaign from its list-row action. Confirmation stays open while saving and after failure. Success opens the new campaign.
 
-The Duplicate action uses the existing replay endpoint: `PATCH /api/campaigns/{campaignId}/redeploy` with a null body. It opens the campaign ID returned in the response. The backend owns copy naming, task creation and all duplication defaults. The UI does not call `/duplicate` or send a name/idempotency key. Request IDs in UI state only correlate responses with the open dialog.
+The Duplicate action follows the API replay handoff: `POST /api/campaigns/{campaignId}/duplicate` with an empty body, offered only for FINISHED campaigns. A 201 response supplies the new ID for navigation. The copy is IDLE, retains script/staff assignments, and has fresh tasks without call history. The source remains unchanged. UI request IDs only correlate responses with the dialog; they are not sent to the API. There are no automatic retries. If the response is lost, refresh the campaign list before resubmitting.
 
-The local API checkout still implements the old redeploy behavior (reactivating the source campaign); deploy the backend team's revised replay implementation for independent campaign copies. Do not assume retries are idempotent without that backend guarantee.
 
 
 Deploy/restart the updated API before using duplication in Dev. Existing replay API compatibility remains, but no campaign Replay button is exposed.
@@ -347,3 +346,12 @@ The call-task table now has a single **CRM** column; the company-account column 
 ### Tenant Dashboard availability — 9 November 2026
 
 Dashboard is hidden for tenants (`CLIENT_ADMIN`) and remains available to platform administrators. A route gate redirects tenant Dashboard visits to Campaigns before loading the Dashboard package, including the default `/app` landing path.
+
+
+# Voice agent campaigns — web handoff integration
+
+Cold Calling supports OPERATOR (default) and VOICE_AGENT, gated by the API's enabled/platformConfigured options. Campaign creation and paused-campaign editing preserve complete voice settings, use NONE for post-call actions, validate scripts/window/timezone, and declare case-sensitive placeholders. Caller selection requests VOICE_AGENT-compatible numbers assigned to the selected tenant; admins can map an inventory number to its Vapi UUID.
+
+Tasks preserve custom values and missing-key lists. Manual creation includes placeholders; the details panel can update them through the dedicated bare-object PATCH, including after CRM import. Existing CSV upload sends the original file to the API. Task tables show resolved values, missing fields, and latest voice status. Attempt cards retain Vapi data without requiring an operator, including uncertain-call guidance. Start/pause is blocked while pending and refreshes the campaign after success; provider setup failures have translated toasts.
+
+Platform settings use the API contract from origin/Vapi, now pulled into the API checkout: GET returns selected plus transcribers/models/voices ID catalogs; PUT sends transcriber/model/voice together. The tab and route are limited to platform admins. Live calling is not verified: the handoff identifies required opt-out provisioning as a deployment blocker; no external test call was made.

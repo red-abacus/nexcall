@@ -14,6 +14,10 @@ The parent owns `.gitmodules`, run configurations, the launcher, these docs and 
 
 The former snapshot setup was converted in place, retaining the same application paths and local dependencies. App documentation and workflows were restored to their original repository versions. No commits or pushes were performed by the conversion.
 
+## Decision records
+
+- [CRM and campaign backend decisions](decisions/2026-11-05-crm-backend.md)
+
 ## Clone and initialize
 
 ```sh

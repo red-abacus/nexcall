@@ -26,6 +26,19 @@ env:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: nexcall-ci
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - 3306/tcp
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,6 +57,10 @@ jobs:
 
       - name: Run tests
         working-directory: apps/api
+        env:
+          NEXCALL_CRM_TEST_MYSQL_URL: jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports[3306] }}/
+          NEXCALL_CRM_TEST_MYSQL_USER: root
+          NEXCALL_CRM_TEST_MYSQL_PASSWORD: nexcall-ci
         run: ./gradlew clean test
 
       - name: Setup Helm

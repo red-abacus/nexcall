@@ -16,7 +16,8 @@ The former snapshot setup was converted in place, retaining the same application
 
 ## Decision records
 
-- [CRM and campaign backend decisions](decisions/2026-11-05-crm-backend.md)
+- [Project decision log and current statuses](decisions/README.md)
+- [CRM and campaign backend baseline](decisions/2026-11-05-crm-backend.md)
 
 ## Clone and initialize
 
@@ -76,6 +77,8 @@ The root [web](../.github/workflows/deploy-web-gke-prod.yml) and [API](../.githu
 For the parent workflows, configure `SUBMODULES_READ_TOKEN` with read access to the parent and all three application repositories. The parent's default GitHub token does not provide cross-repository access. Checkout handles the SSH submodule URLs using that token. Also configure Google Workload Identity trust for the parent repository, existing deployment secrets, and the `non-prod` GitHub environment before dispatching.
 
 Parent workflows use separate `WEB_APP_BASE_URL` and `API_APP_BASE_URL` variables. App repository workflows retain their original variables and push triggers. Deployment documentation inside each app describes that app's standalone repository; root workflow paths and variables are described here. No workflow was dispatched during conversion.
+
+Both API deployment workflows read the GCS project, bucket names, and service account emails from the API chart's [production values](../apps/api/deploy/helm/nexcall-api/values.prod.yaml). Follow the [API GCS setup](../apps/api/docs/deployment-gke.md#google-cloud-storage) to provision the private buckets and bind access to the API pod's Kubernetes service account.
 
 Docker build contexts remain app-local:
 

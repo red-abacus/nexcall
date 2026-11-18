@@ -2,6 +2,14 @@
 
 The initial decisions were agreed on 2026-11-05 (Europe/Bucharest) and recorded at `2026-11-05T14:24:12Z` (UTC). A product choice is an explicit user decision. A plan default is a technical choice accepted with the implementation plan. Keep superseded entries and link them to their replacements.
 
+Reconciled on 2026-11-18. This file preserves the original decisions and dated verification history.
+See the [project index](README.md) for later decisions. Current replacements include
+[automatic task selection](2026-11-18-campaigns-and-calling.md#call-001-automatic-next-task),
+[broader disposition/history support](2026-11-18-campaigns-and-calling.md#call-002-disposition-identity-and-crm-history),
+[shared guides](2026-11-18-campaigns-and-calling.md#call-011-shared-guide-and-reusable-script-snapshots)
+and [GCS storage](2026-11-18-platform-and-delivery.md#plat-005-replace-azure-storage-with-google-cloud-storage).
+Accepted entries retain their original approval status; that status is not a claim of current deployment.
+
 ## Shared API and Web
 
 | ID | Status and origin | Decision | Why and consequence | Reference |
@@ -10,13 +18,13 @@ The initial decisions were agreed on 2026-11-05 (Europe/Bucharest) and recorded 
 | CRM-002 | Accepted · Product choice | Platform admins select one tenant. Client admins use their membership. Campaign operations use the campaign tenant. | The API principal has no active tenant for platform admins. Lists, writes, relationships, downloads, and import searches must all enforce the resolved tenant. | [Customer service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/services/CustomerService.java) |
 | CRM-003 | Accepted · Product choice | Archive accounts and contacts. Unlink an archived account’s contacts. Cancel an archived contact’s queued tasks and let active attempts finish. | This preserves historical attribution while removing archived records from active views and dialing. Every path back to the queue cancels an archived contact’s task. | [CRM handoff](../../apps/web/docs/crm-phase-1-backend-handoff.md), [Call task service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/services/CallTaskService.java) |
 | CRM-004 | Accepted · Product choice | Require a leading plus and normalize new CRM, prospect CSV, and cold manual-task phones to international form. | The tenant lacks structured country data for local dialing. Legacy debt-recovery inputs retain their existing contract. | [Customer entity](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/entities/Customer.java) |
-| CRM-005 | Accepted · Plan default | Keep legacy campaigns as debt recovery and add immutable cold calling with one tenant-scoped CALL script. | Campaign type determines the manual form, script selection, and export schema. Existing disposition and Twilio setup remain compatible. | [Campaign import contract](../../apps/web/docs/campaign-call-task-imports.md) |
+| CRM-005 | Accepted; extended by [CALL-011](2026-11-18-campaigns-and-calling.md#call-011-shared-guide-and-reusable-script-snapshots) · Plan default | Keep legacy campaigns as debt recovery and add immutable cold calling with one tenant-scoped CALL script. | Campaign type remains immutable. Cold Calling now also uses the shared campaign guide and copied preset text described in CALL-011. | [Campaign import contract](../../apps/web/docs/campaign-call-task-imports.md) |
 
 ### CRM-017 · Limit linked history to verified outbound attempts
 
 - **Decision date** 2026-11-05
 - **Recorded at** `2026-11-05T14:55:51Z` UTC
-- **Status** Accepted · Implementation decision
+- **Status** Superseded by [CALL-002](2026-11-18-campaigns-and-calling.md#call-002-disposition-identity-and-crm-history) · Historical implementation decision
 - **Decision** Record CRM dispositions for outbound attempts with a verified attempt key. Keep provider-scoped inbound routing and let callbacks release inbound tasks.
 - **Rationale and consequence** The inbound notification arrives separately from the SDK invite and carries no trusted leg correlation. The API requires a verified outbound attempt key to record a linked disposition.
 - **Reference** [Operator call effects](../../apps/web/modules/operator/src/lib/store/twilio.effects.ts), [Disposition service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/services/CallDetailsService.java)
@@ -25,7 +33,7 @@ The initial decisions were agreed on 2026-11-05 (Europe/Bucharest) and recorded 
 
 - **Decision date** 2026-11-05
 - **Recorded at** `2026-11-05T14:55:51Z` UTC
-- **Status** Accepted · Implementation decision
+- **Status** Superseded by [CALL-001](2026-11-18-campaigns-and-calling.md#call-001-automatic-next-task) on 2026-11-07 · Historical implementation decision
 - **Decision** The API accepts `crmCapable=true` from compatible clients on next-task reads. Requests without it see legacy unlinked debt-recovery tasks.
 - **Rationale and consequence** Older clients lack the attempt key and cold script support. Filtering the queue avoids presenting a task to earlier clients that cannot dial it. The restored Angular implementation sends the capability flag.
 - **Reference** [Operator next-task endpoint](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/controllers/OperatorCallTaskController.java)
@@ -34,7 +42,7 @@ The initial decisions were agreed on 2026-11-05 (Europe/Bucharest) and recorded 
 
 | ID | Status and origin | Decision | Why and consequence | Reference |
 | --- | --- | --- | --- | --- |
-| CRM-006 | Accepted · Product choice | Publish CRM history only for saved operator dispositions, once per linked call attempt. | A task can return to the queue after a disposition. The persisted attempt identifies the outcome, dialed number, and operator even when the same task is retried. | [Call disposition service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/services/CallDetailsService.java) |
+| CRM-006 | Superseded in scope by [CALL-002](2026-11-18-campaigns-and-calling.md#call-002-disposition-identity-and-crm-history) · Original product choice | Publish CRM history only for saved operator dispositions, once per linked call attempt. | Attempt identity remains required for attribution; current history also supports trusted voice-agent results and matched inbound events. | [Call disposition service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/services/CallDetailsService.java) |
 | CRM-007 | Accepted · Product choice | Save the disposition and outbox event together. Retry delivery to CRM independently. | A CRM write failure should not cause a call outcome save to fail. History is eventually consistent and the oldest pending event is monitored. | [Integration guidelines](../../apps/api/docs/guidelines/integrations-background.md#workflow-ordering-and-database-coordination) |
 | CRM-008 | Accepted · Plan default | Adopt additive Liquibase migrations in the customer persistence unit, with the bundled CAEN Rev. 3 and NAICS US 2022 datasets. | This places CRM and calling writes in one transaction boundary and preserves classification versions and string codes. | [Customer persistence config](../../apps/api/src/main/java/com/nexcall/monolith/config/jpa/CustomerJpaConfig.java), [Catalog data](../../apps/web/modules/settings/assets/industry-classifiers/catalog.json) |
 | CRM-009 | Superseded by [CRM-022](#crm-022--api-simplification-backlog) · Plan default | Validate and scan attachments before private Azure Blob upload, then commit metadata with the immutable update. | Users receive a successful update once its attachments are available. Failed uploads and interrupted writes need cleanup. | [CRM attachment contract](../../apps/web/docs/crm-phase-1-backend-handoff.md#update-and-attachment-endpoints) |
@@ -74,7 +82,7 @@ The initial decisions were agreed on 2026-11-05 (Europe/Bucharest) and recorded 
 - **Status** Accepted · Implementation decision
 - **Decision** Lock the task and persist the new call attempt once, with the task update flushed by the same transaction. Bind the linked browser attempt to signed provider identity.
 - **Rationale and consequence** The persistence context tracks the locked task. A second explicit save of the same transient child caused duplicate attempt inserts during the packaged smoke test.
-- **Reference** [Call details service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/services/CallDetailsService.java), [Webhook signature verification](../../apps/api/src/main/java/com/nexcall/monolith/modules/twilio/service/TwilioWebhookSignature.java)
+- **Reference** [Call details service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/services/CallDetailsService.java), [Webhook signature verification](../../apps/api/src/main/java/com/nexcall/monolith/shared/phone/TwilioWebhookSignature.java)
 
 ### CRM-019 · Scope conference reads and treat imported account IDs as snapshots
 
@@ -91,7 +99,7 @@ The initial decisions were agreed on 2026-11-05 (Europe/Bucharest) and recorded 
 - **Recorded at** `2026-11-05T16:57:51Z` UTC
 - **Status** Implemented · User-approved simplification
 - **Decision** Simplify the backend that serves the existing Angular CRM and campaign endpoints. Preserve the web contract, tenant authorization, and reliable retries.
-- **Rationale and consequence** Spring binding, repositories, and transaction events can handle much of the plumbing. The list below records the changes for a separate API implementation pass.
+- **Rationale and consequence** Spring binding, repositories, and transaction events handle the plumbing. The list below preserves the completed simplification scope; its Azure storage choice was subsequently replaced by [PLAT-005](2026-11-18-platform-and-delivery.md#plat-005-replace-azure-storage-with-google-cloud-storage).
 - **Reference** [API architecture guidelines](../../apps/api/docs/guidelines/architecture-java-style.md#responsibilities), [DTO guidelines](../../apps/api/docs/guidelines/dto-validation-mapping.md), [Integration guidelines](../../apps/api/docs/guidelines/integrations-background.md#workflow-ordering-and-database-coordination)
 
 1. **Remove ClamAV.** Keep multipart uploads, file size and type checks, private Azure Blob storage, tenant-scoped downloads, idempotency, and cleanup of interrupted uploads. Remove the scanner client, Helm settings, tests, and rollout instructions. Basic file validation cannot detect malware in an otherwise valid file.
@@ -138,16 +146,16 @@ The initial decisions were agreed on 2026-11-05 (Europe/Bucharest) and recorded 
 
 - **Decision date** 2026-11-05
 - **Recorded at** `2026-11-05T16:04:45Z` UTC
-- **Status** Accepted · Explicit user authorization
+- **Status** Implemented · Explicit user authorization; restoration evidence is preserved below
 - **Decision** Restore the Angular implementation and retain the API work. Keep the existing live rollout gates.
 - **Rationale and consequence** The user clarified that the original question asked for an explanation of the web changes. They then explicitly authorized restoration. The recovered Angular changes match the backup exactly.
-- **Reference** [CRM cutover notes](../../apps/web/docs/crm-phase-1-backend-handoff.md#web-cutover-controls), [API rollout guide](../../apps/api/docs/deployment-gke.md#crm-rollout)
+- **Reference** [CRM tenant scope and state operations](../../apps/web/docs/crm-phase-1-backend-handoff.md#live-tenant-scope-and-state-operations), [API rollout guide](../../apps/api/docs/deployment-gke.md#crm-rollout)
 
 ## Mobile
 
 | ID | Status and origin | Decision | Why and consequence | Reference |
 | --- | --- | --- | --- | --- |
-| CRM-012 | Accepted · Product choice | Defer Flutter support for the new CRM and cold-calling functionality. | The mobile client is several versions behind and will be addressed separately. This delivery verifies the API and Angular clients. | [Mobile manifest](../../apps/mobile/pubspec.yaml) |
+| CRM-012 | Deferred · Product choice | Defer Flutter support for the new CRM and cold-calling functionality. | The mobile client is several versions behind and will be addressed separately. This delivery verifies the API and Angular clients. | [Mobile manifest](../../apps/mobile/pubspec.yaml) |
 
 ## Implementation baseline
 
@@ -156,6 +164,8 @@ The initial decisions were agreed on 2026-11-05 (Europe/Bucharest) and recorded 
 The reviewed API checkout was `58ffedf`. The parent recorded `5673991` for its API gitlink at the start of implementation.
 
 ## Verification handoff
+
+These are historical reports from 2026-11-05, not fresh verification of the 2026-11-18 checkout.
 
 Verified locally at `2026-11-05T15:02:47Z` UTC.
 

@@ -113,6 +113,36 @@ permission to upgrade them or introduce unsupported standalone/Signals patterns.
 Sources: [web architecture](../../apps/web/docs/architecture.md),
 [package structure](../../apps/web/docs/structure.md), [build guide](../../apps/web/docs/build-and-run.md).
 
+### PLAT-009 Correlate API request and workflow logs
+
+**Source and approval date:** 2026-11-19. **Status:** Implemented and locally verified in the API checkout.
+**Origin:** Explicit troubleshooting requirement and user-approved API implementation plan.
+The full suite and bootJar passed locally, with 837 tests passing (140 on MySQL), one opt-in live
+Vapi test skipped and zero failures. Deployment remains separate.
+
+Keep the server-generated `X-Request-ID` and make it available to existing browser origins. Scope
+it to the incoming API request and in-process continuations. Provider response IDs remain distinct.
+Use an independent `runId` for scheduled work and link callbacks, retries and projections by
+existing call attempt, operation, job or agent revision IDs.
+
+Use the existing container logging pipeline. INFO covers significant changes, failures and slow
+requests (one second by default). DEBUG adds routing, upstream exchange details and expected skip
+reasons. Distinguish work prepared inside a transaction from a successful commit and distinguish
+the HTTP status sent from the outcome of later streaming work.
+
+The implementation removes password mismatch values and other identified contact data from log sites.
+Legacy CSV intake parses sequentially so OpenCSV cannot print conversion input on a worker thread.
+Provider logs keep recognized validation descriptions and safe correlation IDs, while withholding
+free-form upstream diagnostics that may contain customer content. Number recovery uses the logged
+operation ID and pod attribution instead of a published owner token. Already verified stateless
+authentication is saved as a request attribute so Spring can authenticate the same async redispatch.
+
+Production log volume and retrieval across pods remain rollout checks. The current rollout
+instructions are in the API troubleshooting guide.
+
+Sources: user approval in this chat, [API logging plan](../../apps/api/docs/superpowers/plans/2026-11-19-api-request-and-workflow-logging.md),
+[troubleshooting guide](../../apps/api/docs/deployment-gke.md#find-failed-api-requests).
+
 ### DOC-001 Maintain decisions centrally and send only contract differences to web
 
 **Decision date:** 2026-11-18. **Status:** Accepted · Explicit user instruction; documented here.

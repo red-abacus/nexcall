@@ -268,10 +268,16 @@ jobs:
 
       - name: Deploy with Helm
         id: deploy
+        env:
+          NEXCALL_VAPI_PRESETS_JSON: ${{ vars.NEXCALL_VAPI_PRESETS_JSON || env.NEXCALL_VAPI_PRESETS_JSON }}
         run: |
           set -euo pipefail
           RELEASE_NAME="${HELM_RELEASE:-$APP_NAME}"
-          if ! helm upgrade --install "$RELEASE_NAME" "$HELM_CHART_PATH" \
+          helm_args=(upgrade --install "$RELEASE_NAME" "$HELM_CHART_PATH")
+          if [[ -n "${NEXCALL_VAPI_PRESETS_JSON:-}" ]]; then
+            helm_args+=(--set-json "vapi.presets=$NEXCALL_VAPI_PRESETS_JSON")
+          fi
+          if ! helm "${helm_args[@]}" \
             --namespace "$K8S_NAMESPACE" \
             --values "$HELM_VALUES_FILE" \
             --set image.repository="${{ needs.build_push.outputs.image_repository }}" \

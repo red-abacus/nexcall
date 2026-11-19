@@ -11,7 +11,9 @@ contracts. Both link back here for current decision status.
 | [CRM and campaign baseline](2026-11-05-crm-backend.md) | Original CRM-001 through CRM-024, with replacement links for changed behavior |
 | [Platform and delivery](2026-11-18-platform-and-delivery.md) | Repository boundaries, monolith, deployment, storage, identity, dates and documentation |
 | [Campaigns and calling](2026-11-18-campaigns-and-calling.md) | Task selection, dispositions, hours, attempts, retries, recordings, scripts and duplication |
-| [Inbound routing and agents](2026-11-18-inbound-routing-and-agents.md) | Backend simplification IN-008/IN-009/IN-010 implemented; [implementation plan](../../apps/api/docs/superpowers/plans/2026-11-18-inbound-routing-simplification.md) tracks verification; web/mobile integration and rollout remain separate |
+| [Inbound routing and agents](2026-11-18-inbound-routing-and-agents.md) | IN-008/IN-009/IN-010 implemented; direct Twilio onboarding and API-wide preflight removal IN-011/IN-012 implemented and locally verified ([plan](../../apps/api/docs/superpowers/plans/2026-11-18-twilio-number-onboarding.md)); client integration and rollout remain separate |
+| [Number associations and release](2026-11-19-number-associations-and-release.md) | NUM-001 through NUM-005 implemented in the API checkout; role-scoped associations/counts, database release to the pool, restart guards and zero-live local Vapi cleanup; frontend handoff delivered, production rollout separate |
+| [Voice catalog, CRM export and campaign language](2026-11-19-voice-catalog-crm-and-language.md) | CRM-025/CALL-013/NUM-006 implemented locally; 755 tests/132 MySQL and package passed; [API plans/handoffs](../../apps/api/docs/superpowers/plans/2026-11-19-inbound-workflow-completion.md); explicit en/ro and reset-before-migration required; VOICE-001 pending authenticated catalog access; deployment pending |
 | [Subscriptions and call limits](2026-11-18-subscriptions-and-call-limits.md) | Commercial terms, settlement, usage, rollout, overrun and duration controls |
 
 The 2026-11-18 records consolidate the dated plans, handoffs and current implementation available

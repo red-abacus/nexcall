@@ -9,6 +9,16 @@ their superseded scope. The Collections sharing exception is confirmed in IN-009
 [implementation plan](../../apps/api/docs/superpowers/plans/2026-11-18-inbound-routing-simplification.md)
 tracks delivery and verification. Web/mobile integration and production rollout remain separate.
 
+The later request for direct Twilio inventory onboarding is recorded in [IN-011](#in-011-direct-twilio-inventory-onboarding).
+It is implemented and locally verified in the API checkout; production rollout remains separate.
+The user subsequently confirmed agent preflight removal throughout the API in
+[IN-012](#in-012-remove-agent-route-preflight); that removal is also implemented and locally verified.
+
+The 2026-11-19 [number lifecycle requirements](2026-11-19-number-associations-and-release.md)
+add role-scoped association reads, explicit database release and zero-live local Vapi cleanup.
+Those requirements are approved and implemented in the API checkout, with a new frontend handoff.
+They replace the unused-mapping lifecycle below; earlier verification retains its historical scope.
+
 ### IN-001 Operator inbound mode and matched history
 
 **Source date:** 2026-11-13. **Status:** Partially superseded by [IN-008](#in-008-preserve-collections-inbound-and-reject-other-outbound-returns) and [IN-010](#in-010-simplification-implementation); Collections behavior remains implemented.
@@ -81,7 +91,7 @@ Sources: [number service](../../apps/api/src/main/java/com/nexcall/monolith/modu
 
 ### IN-005 Confirm takeovers and external route replacement
 
-**Source dates:** agent contract and 2026-11-17. **Status:** Campaign takeovers superseded by [IN-009](#in-009-share-outbound-numbers-within-one-tenant)/[IN-010](#in-010-simplification-implementation); external-route confirmation remains implemented.
+**Source dates:** agent contract and 2026-11-17. **Status:** Campaign takeovers superseded by [IN-009](#in-009-share-outbound-numbers-within-one-tenant)/[IN-010](#in-010-simplification-implementation). External-route confirmation is superseded as a requirement by [IN-011](#in-011-direct-twilio-inventory-onboarding)/[IN-012](#in-012-remove-agent-route-preflight), with the replacement implemented and locally verified in the API checkout. Historical approval/restoration behavior below is retained as superseded context.
 
 Preflight reports affected campaigns and provider routing conflicts. Originally a campaign
 takeover used an override flag and five-minute token, then paused and detached the incumbent at
@@ -98,6 +108,10 @@ Sources: [preflight and override handoff](../../apps/api/docs/api/inbound-agent-
 ### IN-006 One shared signed Voice webhook
 
 **Source date:** 2026-11-17. **Status:** Implemented · Routing architecture choice.
+
+The implemented [NUM-002](2026-11-19-number-associations-and-release.md#num-002-immediate-database-release-to-the-unassigned-pool)
+explicitly rejects new calls to unassigned pool inventory before legacy lookup. Existing-call
+receipt routing remains intact; see its separate implementation and verification record.
 
 Route NexCall-managed numbers through signed POST `/api/twilio/incomingCall`. Resolve committed
 ownership locally; ready active inbound agents within hours bridge directly to authenticated
@@ -187,3 +201,64 @@ is prepared for rollout. Production data/provider checks and deployment have not
 with zero failures, errors or skips, including 10 MySQL allocation/concurrency cases. All five
 audit SELECTs executed on a disposable migrated schema. Providers were mocked; no client
 build/test or production/provider pilot is asserted.
+
+### IN-011 Direct Twilio inventory onboarding
+
+**Source/decision date:** 2026-11-18. **Status:** Accepted requirement · Explicit user decision;
+approved plan implemented and locally verified in the API checkout; no deployment or live provider mutation.
+
+The user requested removing the Twilio preflight/existing-webhook approval process. When a
+platform administrator adds a number, verify that it exists in the configured Twilio account,
+configure its inbound webhook regardless of the old value, and confirm success only after that
+operation succeeds. This replaces the inventory approval requirement in IN-005; it does not
+authorize taking another tenant's inventory or overriding campaign allocation conflicts.
+Application changes are API-only and a final client handoff is required.
+
+**Later requirement, 2026-11-19:** Retaining/discovering unused inventory Vapi mappings is
+superseded as the desired lifecycle by
+[NUM-004](2026-11-19-number-associations-and-release.md#num-004-clear-the-local-vapi-mapping-at-zero-live-associations).
+Cleanup and lazy first-use mapping are implemented in the API checkout. Direct onboarding/webhook
+behavior remains; the original verification report below retains its historical scope.
+
+The implemented design uses synchronous provider-first configuration, retains voice capability
+validation, removes inventory webhook statuses and background setup, and provides same-number
+PATCH for explicit legacy repair. A successful provider update cannot be atomically rolled back
+when the later database save fails; the recovery is an explicit repeat request.
+These are technical choices from the design the user approved for implementation, distinct from the initial explicit product requirement.
+
+Source: the user's direct simplification request in this repository chat. See the
+[design](../../apps/api/docs/superpowers/specs/2026-11-18-twilio-number-onboarding-design.md) and
+[plan](../../apps/api/docs/superpowers/plans/2026-11-18-twilio-number-onboarding.md).
+The [frontend/configuration handoff](../../apps/api/docs/api/twilio-number-onboarding-web-handoff.md)
+records removed contracts and removable configuration. Verification on 2026-11-18: 683 API tests,
+zero failures/errors/skips, bootJar and inbound enabled/disabled Helm renders passed. All five
+substantive independent-review findings were reproduced and fixed, including active-line continuity,
+terminal legacy takeover migration, API-local workflow cleanup, stale tenant replacement and 2xx
+provider acknowledgement. Production JDK wire/timeout tests also passed. Providers were
+mocked or local stubs; no deployment or live provider update is asserted.
+
+### IN-012 Remove agent route preflight
+
+**Source/decision date:** 2026-11-18. **Status:** Accepted requirement · Explicit user clarification;
+approved technical plan implemented and locally verified in the API checkout; not deployed.
+
+The user explicitly confirmed removal throughout the API, including inbound-agent creation and
+editing: use internal checks for ongoing campaign/other-agent allocation and override the existing
+Twilio inbound webhook. Remove provider-route preflight, route fingerprints and approval tokens.
+This does not permit cross-tenant access or incompatible internal allocation.
+
+The implemented technical design retains direct tenant/campaign/unfinished-call allocation checks,
+leaving the shared Voice webhook attached on release instead of restoring an external route, and
+tracking actual installation attempts internally so unactivated drafts do not erase callbacks.
+Legacy missing Twilio SIDs resolve through identity-only account lookup. Vapi resource provisioning,
+signed callbacks, call history, subscription controls and provisioning events retain their independent
+contracts. These lifecycle details are technical choices in the approved design, not separately attributed product decisions.
+
+This supersedes the remaining external-route confirmation requirement in IN-005. Source: the user's
+full-API scope clarification in this repository chat. The [design and plan](../../apps/api/docs/superpowers/plans/2026-11-18-twilio-number-onboarding.md)
+track review, implementation and verification. Legacy queued cutovers must be drained or recovered
+explicitly before incompatible recovery state is removed. The new migration halts on unresolved work
+and preserves identities/mappings while removing obsolete state. The inbound confirmation secret,
+its Kubernetes key and Spring override are unused after older API instances are drained. Keep the
+SIP/webhook secrets, public origin and Twilio calling credentials. Verification is recorded in IN-011
+and the handoff. No production migration, provider mutation or deployment is asserted.

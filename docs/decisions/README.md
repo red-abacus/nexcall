@@ -6,6 +6,13 @@ contracts. Both link back here for current decision status.
 
 ## Records
 
+- [Shared agent configuration](2026-11-22-shared-agent-configuration.md): AGENT-001 records
+  requested common fields and templated prompts; AGENT-002 records failed-transfer behavior and billing
+  limits; AGENT-003 implements shared catalogues/configuration and the accepted Vapi warm transfer in
+  the API checkout; AGENT-004 consolidates the catalogue HTTP handlers. The final check-in review
+  passed the MySQL-enabled build with 927 tests passed and one opt-in live test skipped. Live transfer behavior,
+  human-leg billing evidence, frontend and deployment remain separate.
+
 | Record | Scope |
 |---|---|
 | [CRM and campaign baseline](2026-11-05-crm-backend.md) | Original CRM-001 through CRM-024, with replacement links for changed behavior |
@@ -13,7 +20,7 @@ contracts. Both link back here for current decision status.
 | [Campaigns and calling](2026-11-18-campaigns-and-calling.md) | Task selection, dispositions, hours, attempts, retries, recordings, scripts and duplication |
 | [Inbound routing and agents](2026-11-18-inbound-routing-and-agents.md) | IN-008/IN-009/IN-010 implemented; direct Twilio onboarding and API-wide preflight removal IN-011/IN-012 implemented and locally verified ([plan](../../apps/api/docs/superpowers/plans/2026-11-18-twilio-number-onboarding.md)); client integration and rollout remain separate |
 | [Number associations and release](2026-11-19-number-associations-and-release.md) | NUM-001 through NUM-005 implemented in the API checkout; role-scoped associations/counts, database release to the pool, restart guards and zero-live local Vapi cleanup; frontend handoff delivered, production rollout separate |
-| [Voice catalog, CRM export and campaign language](2026-11-19-voice-catalog-crm-and-language.md) | CRM-025/CALL-013/NUM-006 implemented locally; CALL-015/016 defaults and language fallbacks verified with 767 tests and bootJar; CALL-017 [API implementation and handoff complete](../../apps/api/docs/api/campaign-voice-selection-web-handoff.md), verified with 826 tests and bootJar after one review/fix pass; VOICE-002 shares private/custom voices, VOICE-003 accepts available previews, VOICE-004 records exact identities and bounded live reads; inbound migration, localization, frontend and deployment remain separate |
+| [Voice catalog, CRM export and campaign language](2026-11-19-voice-catalog-crm-and-language.md) | CRM-025/CALL-013/NUM-006 implemented locally; CALL-015/016 defaults and language fallbacks verified with 767 tests and bootJar; CALL-017 [API implementation and handoff complete](../../apps/api/docs/api/campaign-voice-selection-web-handoff.md), verified with 826 tests and bootJar after one review/fix pass; VOICE-002 shares private/custom voices, VOICE-003 accepts available previews, VOICE-004 records exact identities and bounded live reads; VOICE-005 implements inbound shared voices (2026-11-22); localization, frontend and deployment remain separate |
 | [Subscriptions and call limits](2026-11-18-subscriptions-and-call-limits.md) | Commercial terms, settlement, usage, rollout, overrun and duration controls |
 
 The 2026-11-18 records consolidate the dated plans, handoffs and current implementation available
@@ -22,6 +29,12 @@ Original dates and historical CRM IDs remain intact. An implementation choice is
 to the user unless the source records that authorization.
 
 ## Status meanings
+
+2026-11-22: [VOICE-005](2026-11-19-voice-catalog-crm-and-language.md#voice-005-inbound-uses-the-shared-voice-catalog)
+implements inbound use of the shared voice catalog and removes `/api/inbound/voices`.
+The subsequent [VOICE-006](2026-11-19-voice-catalog-crm-and-language.md#voice-006-remove-inbound-legacy-voice-compatibility)
+removes legacy voice compatibility by explicit user instruction.
+Client integration and deployment remain separate.
 
 | Status | Meaning |
 |---|---|

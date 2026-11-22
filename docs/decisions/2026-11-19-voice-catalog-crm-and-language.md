@@ -1,5 +1,9 @@
 # Voice catalog, CRM export and campaign language
 
+2026-11-22 follow-up: [AGENT-003](2026-11-22-shared-agent-configuration.md#agent-003-shared-agent-catalogue-configuration-and-vapi-warm-transfer)
+moves the catalogue to `/api/agents/voices` and adds common nested agent configuration. The earlier
+VOICE/CALL records below preserve their source dates and contracts; use the newer handoff for current routes.
+
 Recorded on 2026-11-19 (Europe/Bucharest). This records the user's API-only follow-up to
 `/Users/folea/Downloads/inbound-backend-fixes-handoff.md` and the subsequent API review in this
 chat. The user approved the API design, plans and API-only implementation on 2026-11-19.
@@ -8,7 +12,7 @@ are separate facts. No deployment, provider changes or client implementation wer
 
 ### VOICE-001 Replace the hardcoded inbound voice list
 
-**Status:** Shared catalog implemented in checkout under CALL-017; inbound-agent migration remains pending.
+**Status:** Shared catalog implemented under CALL-017; inbound migration implemented under VOICE-005 (2026-11-22).
 **Origin:** Explicit user request and live-source approach approval, 2026-11-19.
 
 Replace the four hardcoded inbound choices with the configured Vapi organization's entire available
@@ -21,9 +25,10 @@ omits the route, and published version/stability guarantees remain absent. Expli
 errors and transport fixtures guard drift; no runtime dashboard scraper is used.
 
 The shared `/api/voices` and preview endpoints are implemented for outbound campaigns. Earlier
-inbound adapter/interface sketches are superseded by this shared infrastructure, while migration of
-`InboundAgentCatalog`, inbound desired/applied configuration and legacy routes remains separately
-pending. No inbound request migration or frontend change is asserted here.
+inbound adapter/interface sketches are superseded by this shared infrastructure. The subsequent
+VOICE-005 migration covers inbound desired/applied configuration and removes the old catalog route,
+initially retaining legacy saved-voice compatibility. VOICE-006 subsequently removes that
+compatibility by explicit user instruction. Frontend integration remains separate.
 
 Earlier public-source investigation and the initial lack of test credentials are retained in the
 [verification record](../../apps/api/docs/api/vapi-live-voice-catalog-contract.md); they describe a
@@ -35,6 +40,55 @@ Sources: explicit user approvals in this chat;
 [voice overview](https://docs.vapi.ai/providers/voice/overview),
 [shared API plan](../../apps/api/docs/superpowers/plans/2026-11-19-campaign-voice-selection.md),
 [frontend handoff](../../apps/api/docs/api/campaign-voice-selection-web-handoff.md).
+
+### VOICE-005 Inbound uses the shared voice catalog
+
+**Decision/source date:** 2026-11-22. **Origin:** Explicit user request and implementation authorization.
+**Status:** Implemented in checkout; verification below is separate from deployment.
+
+Remove `/api/inbound/voices`; inbound and outbound consume `/api/voices` and `/api/voices/preview`.
+This completes VOICE-001's inbound catalog migration. Inbound saves the same exact `voiceSelection`
+identity, validated by the shared resolver. Unsupported/language-incompatible choices reject;
+preview availability does not gate selection. Preserve inbound model/transcriber and provisioning.
+
+Historical technical compatibility choice, superseded by VOICE-006: existing legacy specs retain their exact voice/provider until explicitly
+replaced, including unchanged full PUT. New agents require shared selection. No automatic backfill,
+default substitution or provider mutation occurs during migration. JSON storage is additive.
+Resolution occurs outside DB transactions at save and again before provider provisioning, so catalog
+availability affects both; full PUT of shared selections requires live validation. Internal resolution
+is callable by durable workers without a user session; list/preview HTTP access remains role-protected.
+Older API/workers must be drained before selection-only writes. Client cutover and deployment remain
+separate; no web source was changed. This does not unify other agent properties or approve new purposes.
+
+Source: this conversation; [contract delta](../../apps/api/docs/api/inbound-shared-voices-web-handoff.md).
+
+Verification on 2026-11-22: full `./gradlew test bootJar` with disposable local MySQL enabled
+reported 832 tests: 831 passed, zero failures/errors, one opt-in live Vapi catalog test skipped.
+The new tests cover shared payload identity and rejection, legacy preservation, removed endpoint,
+Jackson 2/3 round trips and real MySQL desired/applied/replacement settings. No live provider
+mutation, call pilot, client build or deployment was performed.
+
+### VOICE-006 Remove inbound legacy voice compatibility
+
+**Decision/source date:** 2026-11-22. **Origin:** Explicit user instruction that backwards
+compatibility is unnecessary and legacy voices can be removed.
+**Status:** Implemented in checkout; no deployment or remote data inspection performed.
+
+Remove `LEGACY_VOICES`, legacy lookup/provisioning, the top-level inbound `voiceId` property,
+the old constructor and the update exception for unchanged legacy settings. Require the shared
+`voiceSelection` on inbound create and full update. Missing selections fail before provisioning;
+no automatic conversion, backfill, substitute voice or data deletion is performed.
+This supersedes VOICE-005's initial compatibility precaution, retaining its shared catalog design.
+
+Read-only local inspection found zero inbound campaigns and zero `inbound_agent_config` rows.
+This establishes local state only; any legacy remote configuration is intentionally unsupported
+by this decision and must receive an explicit shared selection before provisioning.
+Sources: this conversation, local MySQL counts, [current client contract](../../apps/api/docs/api/inbound-shared-voices-web-handoff.md).
+
+Verification after compatibility removal: MySQL-enabled full `./gradlew test bootJar` passed
+on 2026-11-22: 831 passed, zero failures/errors, one opt-in live Vapi test skipped (832 total).
+Required selection, missing-selection rejection, exact shared payloads and JSON persistence
+are covered. No deployment or live provider mutation was performed.
 
 ### VOICE-002 Share private and custom voices with all tenants
 

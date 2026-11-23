@@ -32,6 +32,18 @@ to the user unless the source records that authorization.
 
 ## Status meanings
 
+2026-11-23: [SUB-017](2026-11-18-subscriptions-and-call-limits.md#sub-017-package-unpublish-and-retirement)
+adds unused-package unpublish, draft-only editing and preserved archival billing, with one
+[consolidated subscription API handoff](../../apps/api/docs/api/subscriptions-web-handoff.md).
+
+2026-11-23: [SUB-016](2026-11-18-subscriptions-and-call-limits.md#sub-016-current-tenant-subscription-and-access)
+adds a current-tenant subscription/access read after login, with identity-derived scope and separate
+subscription gates. API verification, client wiring and deployment are tracked separately.
+
+2026-11-23: [SUB-015](2026-11-18-subscriptions-and-call-limits.md#sub-015-positive-integer-package-price-duration)
+replaces fixed 1/3/12-month price terms with any positive integer month duration, retaining one-month
+packages. API implementation and verification are separate from client integration and deployment.
+
 2026-11-22: [VOICE-005](2026-11-19-voice-catalog-crm-and-language.md#voice-005-inbound-uses-the-shared-voice-catalog)
 implements inbound use of the shared voice catalog and removes `/api/inbound/voices`.
 The subsequent [VOICE-006](2026-11-19-voice-catalog-crm-and-language.md#voice-006-remove-inbound-legacy-voice-compatibility)

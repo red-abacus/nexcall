@@ -15,7 +15,8 @@ Subscriptions belong to tenants, with separate AI/operator minute pools shared a
 Platform admins manage commercial operations; benefits supplement existing role, tenant and
 environment restrictions. Keep one current base subscription, purchased term snapshots and
 outstanding-invoice protection against replacement. Publishing freezes commercial terms;
-changed terms require a new package identity. Archiving preserves prior purchases.
+changed terms require a new package identity. Archiving preserves prior purchases. [SUB-017](#sub-017-package-unpublish-and-retirement) extends
+package lifecycle and supersedes the source plan's allowance for metadata edits after publication.
 
 Evidence: [package service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/subscriptions/SubscriptionPackageService.java),
 [billing service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/subscriptions/SubscriptionBillingService.java).
@@ -51,7 +52,8 @@ Evidence: [pricing](../../apps/api/src/main/java/com/nexcall/monolith/modules/cu
 
 **Status:** Accepted and implemented · Agreed requirement and supplied web contract.
 
-Support 1/3/12-month terms, RECURRING or ONE_TIME, and MONTHLY or PER_TERM allowances. Monthly
+The original 1/3/12-month restriction is superseded by [SUB-015](#sub-015-positive-integer-package-price-duration)
+on 2026-11-23. Support RECURRING or ONE_TIME and MONTHLY or PER_TERM allowances. Monthly
 resets are independent of a quarterly/annual paid term and use the original UTC anniversary,
 clamping short months without drifting later anniversaries. Included/top-up credit expires
 without rollover. A recurring term produces one renewal invoice and waits for settlement;
@@ -189,10 +191,132 @@ Evidence: [response models](../../apps/api/src/main/java/com/nexcall/monolith/sh
 **Status:** Deferred · Scope boundary in the supplied contract and plan.
 
 Automated collection, payment-provider checkout, refunds, general cancellation/replacement,
-discounts, customer self-service, tax/gross fiscal invoice models, arbitrary credit editing and
+discounts, customer self-service mutations, tax/gross fiscal invoice models, arbitrary credit editing and
 minute reservations are outside this delivery. The current ledger is net operational billing.
+Read-only current-tenant subscription visibility is added by [SUB-016](#sub-016-current-tenant-subscription-and-access).
 Web/mobile integration is separate from the API implementation; a backend record is not proof
 that those clients or production provider flows have been delivered.
 
 Sources: [plan deferred extension](../../apps/api/docs/superpowers/plans/2026-11-18-tenant-subscriptions-and-call-limits.md),
 [web contract changes](../../apps/api/docs/api/subscriptions-web-handoff.md).
+
+### SUB-015 Positive integer package price duration
+
+**Source/decision date:** 2026-11-23. **Origin:** Explicit user request and clarification that
+one-month packages must remain valid. **Status:** Implemented locally; verification recorded below.
+Implemented and verified in the API checkout; deployment is separate.
+
+Allow `PackagePrice.durationMonths` to be any positive integer, including 1 and values above 12,
+replacing only SUB-004's fixed 1/3/12 restriction. Keep duration inside each price alongside the
+amount for that full term. Existing strict 32-bit JSON integer binding rejects fractions, strings
+and overflow; package validation rejects zero/negative values and null binds to an invalid zero.
+
+The billing service already calculates calendar-month terms dynamically. Monthly allowance resets,
+PER_TERM allowances, calendar-end clamping, recurring/one-time behavior, prices and currency rules
+retain their meanings. Published commercial terms remain locked and tenant term snapshots are
+preserved. No schema migration or package rewrite is required. Client integration and deployment
+remain separate.
+
+Sources: this conversation; [web contract change](../../apps/api/docs/api/subscriptions-web-handoff.md#package-price-duration--2026-11-23);
+[source plan](../../apps/api/docs/superpowers/plans/2026-11-18-tenant-subscriptions-and-call-limits.md).
+
+Verification, 2026-11-23: MySQL-enabled `./gradlew test --tests '*Subscription*' bootJar` passed
+116 tests with zero failures/errors/skips, including 30 MySQL integration tests. New coverage checks
+positive durations beyond the former choices, non-positive/malformed JSON rejection, and settlement
+of 2- and 13-month terms with MONTHLY/PER_TERM allowance boundaries and calendar-end clamping.
+The application JAR built and diff whitespace checks passed. The full application suite was not rerun.
+
+### SUB-016 Current tenant subscription and access
+
+**Source/decision date:** 2026-11-23. **Origin:** Explicit user request to add
+`/api/subscriptions/current` after obtaining the JWT, following the proposed separate status/access
+lookup. Role/membership resolution, response projection and reuse of lifecycle maintenance are
+technical choices. **Status:** Implemented and verified in the API checkout; deployment is separate.
+
+Keep JWT/login contracts unchanged and expose authenticated GET `/api/subscriptions/current`.
+Resolve one active, non-deleted tenant membership matching the authenticated tenant user's role;
+allow CLIENT_ADMIN, OPERATOR, CLOSER and INTEGRATOR_CRM. Reject missing/ambiguous membership and
+platform ADMIN with the existing subscription 403; admins retain their explicit tenant billing
+endpoint. No request tenant ID can override identity. Return 200 with null subscription when
+unassigned and `Cache-Control: no-store` for authenticated tenant responses.
+
+Expose the purchased package name, identity, selected price ID, included features, allowances,
+current status/active flag, term/allowance dates, settled top-up minutes and live usage. Do not
+expose invoice/payment records or the catalogue's other prices. Subscription feature gates are
+separate: enforcement requires ACTIVE plus the purchased feature; observation/recovery mode
+bypasses these gates, including for unassigned tenants. Roles, environment flags, capacities and
+minute admission still apply; a true feature gate is not a promise that a call can start.
+
+Reuse admin billing's lazy lifecycle maintenance for renewal, expiry and allowance resets;
+repeat reads must not duplicate renewal invoices. This read extension narrows SUB-014's deferred
+client scope without authorizing tenant commercial mutations. Frontend/mobile login integration,
+production deployment and any future multi-tenant selector remain separate work.
+
+Sources: this conversation; [API handoff](../../apps/api/docs/api/subscriptions-web-handoff.md#current-tenant-subscription-after-login--2026-11-23);
+[source plan](../../apps/api/docs/superpowers/plans/2026-11-18-tenant-subscriptions-and-call-limits.md#current-tenant-read-extension--2026-11-23).
+
+Verification, 2026-11-23: `./gradlew test --tests '*Subscription*' --tests '*TenantAdminLifecycleTest'
+bootJar` passed 115 tests; 28 opt-in MySQL tests were skipped in that run. A separate run of
+`./gradlew test --tests '*SubscriptionMySqlIntegrationTest' bootJar` with the local MySQL test
+configuration passed all 30 tests, zero skipped. Coverage includes pending/active/expired access,
+observation mode, live usage, recurring lifecycle refresh without duplicate renewal invoices,
+role-matched membership scope, tenant-override isolation, cache headers, and actual JWT/filter-chain
+access with Spring-managed customer transactions. Admin billing remains forbidden to tenant users.
+The JAR and whitespace checks passed. The full application suite was not rerun.
+
+### SUB-017 Package unpublish and retirement
+
+**Source/decision date:** 2026-11-23. **Origin:** Explicit user request to implement the supplied
+`subscription-package-lifecycle-backend-handoff.md` and consolidate subscription handoffs.
+Locking-read implementation and rejection of repeated publish/unpublish are technical choices
+following its status rules. **Status:** Implemented and verified in the API checkout; deployment
+is separate. This supersedes the original source plan's published/archived metadata-edit allowance;
+SUB-001 purchased-term immutability and preservation remain in force.
+
+Add platform-admin POST `/api/subscriptions/packages/{id}/unpublish` returning the complete package
+as DRAFT only when it is PUBLISHED and no tenant subscription has ever referenced it, regardless
+of historical status. All package edits require DRAFT; published/archived metadata-only edits also
+reject with 409 `termsLocked`. Publish requires DRAFT and validation. Archive accepts DRAFT or
+PUBLISHED, including assigned packages, preserves configuration, and is idempotent when already
+ARCHIVED. Archived packages have no restore/edit/delete/publish/unpublish flow. Only unused drafts
+may be physically deleted; retain the existing 200 `{}` deletion contract and `deleteDraftOnly` error.
+
+The complete admin list retains all statuses. Assignment choices must filter PUBLISHED, and
+server-side assignment rejects withdrawn packages. There is no new tenant purchasing catalogue.
+Preview uses existing reads; duplication posts copied configuration to create a new draft identity.
+Do not infer archive-menu delivery from the API; the UI source reports that menu action is separate.
+
+Assignment and lifecycle transitions take the same package-row lock. Unpublish's historical
+reference query is also a locking/current read so an earlier MySQL repeatable-read snapshot cannot
+hide an assignment committed while the lifecycle operation waited. Archival affects no purchased
+terms, access, allowances, top-ups, invoices, payments or recurring renewal terms. No schema or
+historical-data migration is required.
+
+The attachment's statement that unpublish already existed did not match this checkout; it was
+implemented in this task. One self-contained [API handoff](../../apps/api/docs/api/subscriptions-web-handoff.md)
+now covers the original billing baseline plus SUB-015/016/017, replacing separate delta/lifecycle
+handoffs for integration. Preserve source decisions and the [historical plan](../../apps/api/docs/superpowers/plans/2026-11-18-tenant-subscriptions-and-call-limits.md#package-lifecycle-extension--2026-11-23).
+Sources: this conversation and the supplied UI lifecycle handoff (Downloads attachment).
+
+Verification, 2026-11-23: MySQL-enabled `./gradlew test --tests '*Subscription*'
+--tests '*TenantAdminLifecycleTest' bootJar` passed 199 tests, including 42 MySQL integration tests,
+zero failures/errors/skips. Added coverage includes complete unused-package edit/publish/unpublish/
+delete, historical PENDING/TRIAL/ACTIVE/EXPIRED reference rejection (TRIAL is a test-only historical
+status, not a new supported subscription state), direct metadata-edit rejection, archival and
+repeat archive, archived pending settlement, paid top-ups and recurring renewal, HTTP errors,
+and both assignment/withdrawal commit orderings including an earlier repeatable-read snapshot.
+The application JAR and diff whitespace checks passed. Full application suite, client flows and
+production rollout were not rerun or performed.
+
+### Subscription delivery — 2026-11-23
+
+At the user's explicit request, SUB-015/016/017 and their consolidated API handoff were committed
+on API `master` as `4676be4` (`feat(subscriptions): expose tenant access and enforce package lifecycle`).
+The parent tracks that API commit and records the decision/documentation changes on its existing
+`main` branch, as explicitly confirmed by the user. No new branch was created. The earlier parent
+commit `64f6ffe` recording API master integration is also included in this parent delivery.
+The unrelated web checkout and local API `.github/.env` remain outside these commits.
+
+Verification remains the 199-test MySQL-enabled subscription/JWT run (42 MySQL tests, zero
+failures/errors/skips) and successful bootJar recorded above; no source changes followed that run.
+A push is source delivery, not confirmation of deployment, CI success or UI integration.

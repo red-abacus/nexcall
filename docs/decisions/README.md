@@ -32,6 +32,10 @@ to the user unless the source records that authorization.
 
 ## Status meanings
 
+2026-11-23: [SUB-018](2026-11-18-subscriptions-and-call-limits.md#sub-018-package-trials)
+adds one trial per tenant, independent AI/operator trial pools, day expiry awaiting the original
+invoice, immediate fresh paid access on settlement, and migration/rollout requirements.
+
 2026-11-23: [SUB-017](2026-11-18-subscriptions-and-call-limits.md#sub-017-package-unpublish-and-retirement)
 adds unused-package unpublish, draft-only editing and preserved archival billing, with one
 [consolidated subscription API handoff](../../apps/api/docs/api/subscriptions-web-handoff.md).

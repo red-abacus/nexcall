@@ -25,7 +25,8 @@ Evidence: [package service](../../apps/api/src/main/java/com/nexcall/monolith/mo
 
 **Status:** Accepted and implemented · Agreed requirement and supplied web contract.
 
-Assignment creates PENDING access and an OPEN invoice. Only external-payment confirmation
+Assignment without an eligible trial creates PENDING access and an OPEN invoice.
+[SUB-018](#sub-018-package-trials) adds immediate TRIAL access for eligible first-time trials while keeping that invoice unpaid. Only external-payment confirmation
 settles the remainder and activates access or grants top-up minutes atomically, once. Derive
 admin identity, amount and time on the server; use expected outstanding balance and durable
 idempotency fingerprints to reject changed retries. Replays do not restart access or add credit.
@@ -107,7 +108,7 @@ Evidence: [session admission and observations](../../apps/api/src/main/java/com/
 **Status:** Accepted and implemented · Agreed requirement.
 
 Default `minuteOverrunAllowanceMinutes` to five, configurable as a nonnegative integer by platform
-admins. It is shared connected time per tenant/resource/admission period, not per call. Block
+admins. [SUB-018](#sub-018-package-trials) excludes trial periods from this paid overrun allowance. It is shared connected time per tenant/resource/admission period, not per call. Block
 new calls at base exhaustion; ask providers to end already connected calls when shared extra
 time is exhausted. Use database claims, expiring leases and generation fencing for workers in
 each pod. Recheck credit before dispatch so top-ups/corrections can cancel obsolete queued
@@ -150,7 +151,7 @@ Evidence: [void operation](../../apps/api/src/main/java/com/nexcall/monolith/mod
 **Status:** Implemented · Technical choice resolving the plan's rollout review item.
 
 Unassigned existing tenants default to observation. Assignment enables enforcement immediately;
-PENDING access blocks new calls. Base settlement enables enforcement again. Platform admins have
+PENDING access blocks new calls. [SUB-018](#sub-018-package-trials) adds eligible TRIAL access despite the unpaid invoice. Base settlement enables enforcement again. Platform admins have
 an explicit enforcement recovery toggle; disabled enforcement still measures usage. This is the
 current implementation, replacing the draft idea that assignment and enforcement activation
 would always be separate steps. Pilot rollout and provider checks remain operational work.
@@ -243,7 +244,8 @@ unassigned and `Cache-Control: no-store` for authenticated tenant responses.
 Expose the purchased package name, identity, selected price ID, included features, allowances,
 current status/active flag, term/allowance dates, settled top-up minutes and live usage. Do not
 expose invoice/payment records or the catalogue's other prices. Subscription feature gates are
-separate: enforcement requires ACTIVE plus the purchased feature; observation/recovery mode
+separate: enforcement requires ACTIVE plus the purchased feature (extended to unexpired TRIAL by
+[SUB-018](#sub-018-package-trials)); observation/recovery mode
 bypasses these gates, including for unassigned tenants. Roles, environment flags, capacities and
 minute admission still apply; a true feature gate is not a promise that a call can start.
 
@@ -302,7 +304,7 @@ Verification, 2026-11-23: MySQL-enabled `./gradlew test --tests '*Subscription*'
 --tests '*TenantAdminLifecycleTest' bootJar` passed 199 tests, including 42 MySQL integration tests,
 zero failures/errors/skips. Added coverage includes complete unused-package edit/publish/unpublish/
 delete, historical PENDING/TRIAL/ACTIVE/EXPIRED reference rejection (TRIAL is a test-only historical
-status, not a new supported subscription state), direct metadata-edit rejection, archival and
+status at that verification stage; [SUB-018](#sub-018-package-trials) later implements actual TRIAL access), direct metadata-edit rejection, archival and
 repeat archive, archived pending settlement, paid top-ups and recurring renewal, HTTP errors,
 and both assignment/withdrawal commit orderings including an earlier repeatable-read snapshot.
 The application JAR and diff whitespace checks passed. Full application suite, client flows and
@@ -320,3 +322,105 @@ The unrelated web checkout and local API `.github/.env` remain outside these com
 Verification remains the 199-test MySQL-enabled subscription/JWT run (42 MySQL tests, zero
 failures/errors/skips) and successful bootJar recorded above; no source changes followed that run.
 A push is source delivery, not confirmation of deployment, CI success or UI integration.
+
+### SUB-018 Package trials
+
+**Source/decision date:** 2026-11-23. **Origin:** Explicit user request and answers: trial configuration
+contains days, AI minutes and operator minutes; exhaustion blocks only that resource; early payment
+starts a fresh paid term immediately; one trial per tenant across all packages. **Status:** Implemented
+and verified. The user subsequently authorized commit/push delivery; deployment remains separate. This extends SUB-002/004/008/011/016 while preserving their non-trial behavior.
+
+Add optional package `trial: {days, aiMinutes, operatorMinutes}` to draft/full package DTOs and
+snapshot it with the assigned commercial terms. Null/omitted means no trial; a full draft PATCH
+can clear it. Days are positive integers and are consecutive 24-hour UTC days from assignment.
+Minute pools are nonnegative, at least one positive, and positive pools require their package
+calling feature. Those validation details and UTC duration semantics are technical choices.
+
+A first eligible assignment enables enforcement, starts TRIAL immediately, grants the separate
+trial minute pools, and creates the normal OPEN invoice for the selected paid term. Keep existing
+due-on-issue behavior and do not fabricate payment. Tenant-row serialization plus a locking
+historical-trial lookup prevents repeated trials. When already used, a later otherwise valid
+assignment follows the regular PENDING flow; this fallback is a technical choice, not a second
+trial or a new cancellation/replacement route. Existing outstanding-invoice restrictions remain.
+
+One resource's exhaustion blocks only that call type. Live usage counts against its pool. When
+both are exhausted, all calls block; the subscription remains TRIAL until its date deadline or
+payment, so the active flag alone does not promise calling credit. At the deadline, admission
+rejects even without worker refresh or any usage. Refresh moves it to PENDING against the same
+invoice, records trial completion at the deadline, and grants no paid term. Trial capacities and
+non-calling features use the package snapshot; trial periods have no monthly reset or paid grace.
+Existing admin enforcement recovery remains an explicit override, not a tenant trial extension.
+
+At payment, including early payment, close the trial and start ACTIVE paid access with its full
+allowances and term anchored at settlement. Trial and paid periods are distinct, even if payment
+and assignment have the same timestamp. Replays and expiry/payment races must not double-grant.
+Calls retain admission-period attribution for late reports. As a technical continuity choice,
+already connected trial calls may finish after payment while their usage remains in the trial
+ledger; queued trial cutoffs cancel before dispatch on paid activation. Already dispatched provider
+termination cannot be recalled. New calls use the paid pool. Top-up quote/order remains paid-ACTIVE
+only; there is no trial top-up operation.
+
+The existing leased usage/cutoff workers enforce zero-grace trial minute/day limits. Provider
+termination is asynchronous and may overrun deadlines, but new admission is blocked immediately.
+The lifecycle worker includes TRIAL so unused trials also expire. Current/admin read models expose
+TRIAL, actual trial dates/grants, and effective allowances; `/current.active` is true for unexpired
+TRIAL and ACTIVE. Purchased paid terms stay separate from the effective trial minute allowance.
+JWT/login remains unchanged. Archive/unpublish/history rules apply to trial-configured packages.
+
+Migration `038-subscription-trials.xml` adds nullable trial timestamps and a PAID-default period
+phase; existing records/balances are retained. Replace the original period uniqueness index with
+(subscription_id, starts_at, phase), preserving a supporting FK index throughout. Paid activation
+at the assignment instant can therefore create a separate paid period. Trial use requires all
+backend pods to understand TRIAL; enable/assign only after a coordinated upgrade. Rollout/rollback,
+provider timing verification and client integration are separate from local implementation.
+
+Sources: this conversation and the three explicit user answers; [consolidated trial contract](../../apps/api/docs/api/subscriptions-web-handoff.md#trial-packages--2026-11-23);
+[source plan](../../apps/api/docs/superpowers/plans/2026-11-18-tenant-subscriptions-and-call-limits.md#trial-extension--2026-11-23);
+[rollout notes](../../apps/api/docs/deployment-gke.md#subscription-trial-rollout).
+
+Verification, 2026-11-23: MySQL-enabled subscription/JWT selection passed 259 tests, including
+73 MySQL tests, zero failures/errors/skips. The full MySQL-enabled API suite and bootJar then passed:
+1108 passed, zero failures/errors, one intentionally skipped opt-in Vapi live preview test
+(`VapiVoiceCatalogLiveTest.actualAdapterCanListValidateAndRetrieveAnAvailablePreviewWithoutProviderMutation`),
+including 189 MySQL tests. The full run used a temporary Gradle init script setting the Test heap
+to 2 GB (no build configuration change): `./gradlew --init-script
+/tmp/nexcall-subscription-trial-test-heap.gradle test bootJar`, with the local MySQL test URL/user.
+
+Trial coverage includes immediate activation with an unpaid invoice, independent pools and
+zero-grace minute boundaries, unused day expiry, early payment at the exact assignment timestamp,
+late payment, idempotency, once-per-tenant history across packages, current-tenant projection,
+day-expiry cutoff queuing/cancellation after payment, late trial usage isolated from paid grants,
+populated paid-data migration and concurrent expiry/settlement on MySQL. Diff whitespace checks
+passed. No production provider cutoff timing, frontend delivery, commit, push or deployment was
+performed in this trial implementation task.
+
+UI handoff expansion, 2026-11-23: at the user's request the same consolidated handoff now includes
+an explicit [create → assign → invoice → settlement → current-access walkthrough](../../apps/api/docs/api/subscriptions-web-handoff.md#ui-walkthrough-create-package-assign-tenant-retrieve-invoices-and-settle-payment),
+with complete trial/no-trial request examples, the once-per-tenant exception, all per-tenant invoice/
+payment retrieval, settlement/retry rules and UI acceptance checks. It documents that there is no
+global invoice-list endpoint and that tenant `/current` excludes financial records; no additional
+API or permission decision was introduced by this documentation-only follow-up.
+
+Client handoff review, 2026-11-23: at the user's explicit request, the consolidated handoff was
+reviewed against the current controllers, DTOs, package validation, billing and access behavior and
+reorganized for web/mobile integration only. Removed database/migration details, worker/locking
+internals, test counts/commands, rollout procedures, delivery history, seed-offer commentary and
+duplicate flow descriptions. Backend evidence remains in this decision record, the implementation
+plan and deployment notes. Retained client-visible contracts, role boundaries, nullable dates,
+trial eligibility/state semantics, per-tenant invoice retrieval, idempotency, usage units and API
+errors; the target-environment availability note is the only deployment-related client guidance.
+This documentation review changes no API behavior or permissions.
+
+### Trial delivery — 2026-11-23
+
+At the user's explicit follow-up request, trial implementation SUB-018, migration 038, the reviewed
+web/mobile handoff, backend documentation and API credential-file ignore rule were committed on
+API `master` as `33c3e3b` (`feat(subscriptions): add tenant trials and client integration handoff`).
+The parent `main` delivery records this decision update, indexes SUB-018 and advances only the API
+submodule pointer to that commit, with the parent credential-file ignore rule. No branch was created.
+The unrelated web checkout and all credential values remain outside this delivery.
+
+Verification is the full API run recorded above: 1108 tests passed, including 189 MySQL tests,
+zero failures/errors and one opt-in Vapi live preview skipped; bootJar succeeded. No source or
+resource code changed after that run; subsequent edits were documentation and ignore rules.
+Push delivery is not confirmation of CI success, deployment or client integration.

@@ -12,6 +12,8 @@ contracts. Both link back here for current decision status.
   the API checkout; AGENT-004 consolidates the catalogue HTTP handlers. The final check-in review
   passed the MySQL-enabled build with 927 tests passed and one opt-in live test skipped. Live transfer behavior,
   human-leg billing evidence, frontend and deployment remain separate.
+  The 2026-11-23 integration with API `master` is recorded in the same document: 939 tests passed,
+  one opt-in live test skipped, using a temporary 2 GB test heap after the default-heap run exhausted memory.
 
 | Record | Scope |
 |---|---|

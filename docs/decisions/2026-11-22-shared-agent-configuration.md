@@ -177,3 +177,24 @@ and submodule pointer, without pushing. The API implementation and handoffs were
 `codex/shared-agent-configuration`, based on the tested `310805e` checkout. The parent gitlink is
 updated to that API commit in this delivery. The separate API `master` logging commit is not part
 of this tested change. The verification results above apply; no push, deployment or live call occurred.
+
+### Integration with API master
+
+**Source/verification date:** 2026-11-23. **Origin:** Explicit user request to merge `master` into
+`codex/shared-agent-configuration`. This is integration of existing decisions, not a new API contract.
+
+The earlier delivery above was subsequently pushed. API merge commit `894aec5` now combines
+`3e4c0ee` with `master`'s `ff42830` logging changes. The overlapping create/update sections in
+CampaignMutationService retain both shared configuration normalization/validation and the logging
+stage markers. Shared catalogue, template, voice and transfer behavior remain in place. The other
+overlapping changes merged automatically and were reviewed. `master` is an ancestor of the feature
+branch after this merge; the feature branch has not been merged into `master`.
+
+Full MySQL-enabled build of the combined checkout passed: 940 tests total, 939 passed, zero
+failures/errors, one optional `VapiVoiceCatalogLiveTest` skipped. The initial default-heap run
+exhausted Java heap; verification succeeded using a temporary Gradle init script setting the test
+task's maxHeapSize to `2g`. No repository build configuration was changed. Both JARs built; real
+Vapi calls, transfer billing and deployment remain unverified.
+
+The parent gitlink is updated locally to `894aec5` with this documentation. No push or deployment
+is included in this merge follow-up. Sources: this conversation and the merge/build results above.

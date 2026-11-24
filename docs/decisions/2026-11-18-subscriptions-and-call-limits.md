@@ -191,9 +191,10 @@ Evidence: [response models](../../apps/api/src/main/java/com/nexcall/monolith/sh
 
 **Status:** Deferred · Scope boundary in the supplied contract and plan.
 
-Automated collection, payment-provider checkout, refunds, general cancellation/replacement,
+Automated collection, payment-provider checkout, refunds, general replacement and cancellation reversal,
 discounts, customer self-service mutations, tax/gross fiscal invoice models, arbitrary credit editing and
 minute reservations are outside this delivery. The current ledger is net operational billing.
+End-of-period/immediate-unpaid cancellation is added by [SUB-019](#sub-019-tenant-subscription-cancellation).
 Read-only current-tenant subscription visibility is added by [SUB-016](#sub-016-current-tenant-subscription-and-access).
 Web/mobile integration is separate from the API implementation; a backend record is not proof
 that those clients or production provider flows have been delivered.
@@ -341,7 +342,7 @@ trial minute pools, and creates the normal OPEN invoice for the selected paid te
 due-on-issue behavior and do not fabricate payment. Tenant-row serialization plus a locking
 historical-trial lookup prevents repeated trials. When already used, a later otherwise valid
 assignment follows the regular PENDING flow; this fallback is a technical choice, not a second
-trial or a new cancellation/replacement route. Existing outstanding-invoice restrictions remain.
+trial or a new replacement route. [SUB-019](#sub-019-tenant-subscription-cancellation) later adds cancellation without resetting this trial history. Existing outstanding-invoice restrictions remain.
 
 One resource's exhaustion blocks only that call type. Live usage counts against its pool. When
 both are exhausted, all calls block; the subscription remains TRIAL until its date deadline or
@@ -424,3 +425,88 @@ Verification is the full API run recorded above: 1108 tests passed, including 18
 zero failures/errors and one opt-in Vapi live preview skipped; bootJar succeeded. No source or
 resource code changed after that run; subsequent edits were documentation and ignore rules.
 Push delivery is not confirmation of CI success, deployment or client integration.
+
+### SUB-019 Tenant subscription cancellation
+
+**Source/decision date:** 2026-11-24. **Origin:** Explicit user requirement to remove a tenant's
+package at the end of its current paid/trial period, or immediately when no period is active while
+cancelling the unpaid invoice; new assignment then follows the normal flow. Explicit clarification:
+base payment is blocked while trial cancellation is scheduled and cannot withdraw cancellation.
+**Status:** Implemented and verified; source delivery authorized by the user follow-up. Deployment remains separate.
+This implements the limited cancellation previously deferred under SUB-014; refunds, reversal and
+general replacement remain outside scope.
+
+Add platform-admin POST `/api/subscriptions/customers/{customerId}/subscription/unassign` with the
+current `subscriptionId` and an idempotency key. Return the current billing view. A current paid
+term schedules cancellation at billingPeriodEnd (not an intermediate monthly allowance boundary),
+a current trial at trial.endsAt. Retain ACTIVE/TRIAL access subject to existing quota/capacity limits
+until then. With no current paid/trial period, including PENDING/EXPIRED, cancel immediately.
+
+Use the tenant lock to serialize cancellation, payment, lifecycle refresh and assignment. Persist
+requested/effective/completed timestamps and the server-derived requesting administrator. Existing
+scheduled dates cannot be moved by retries. Payload fingerprints and explicit subscription identity
+prevent stale cancellation retries from cancelling a new package. Wrong-tenant references return
+the existing not-found response; tenant users cannot mutate subscriptions.
+
+At completion mark the historical subscription CANCELLED, clear its current assignment, preserve
+commercial/usage/payment history, and void its wholly unpaid OPEN base/renewal/top-up invoices.
+Paid invoices/payments remain untouched; there is no refund. As a financial safety choice, an OPEN
+invoice with recorded successful partial payment rejects cancellation with existing invalidPayment
+rather than writing off money; broader partial-payment resolution remains deferred. Cancellation
+completion enables enforcement, so absence of a package does not become unrestricted observation
+access. Explicit later admin recovery remains available under the existing control.
+
+Future renewal invoices and paid terms are suppressed for the cancelled subscription. Base payment
+on a scheduled trial returns cancellationPending; valid paid-term top-up settlement can continue
+until its original allowance period ends. Replaying an already settled invoice creates no new term.
+The normal assignment entry point first completes due cancellation, allowing a fresh package in
+that same request; trial eligibility history remains once per tenant across all packages.
+
+Current/admin projections expose nullable cancellation dates while scheduled. At completion their
+subscription becomes null, with financial history still in admin billing. Tenant summaries can
+report CANCELLED before reconciliation and NONE after detachment. Admission denies new calls at
+the effective deadline without waiting for background maintenance; already connected calls retain
+existing limits and usage attribution. Existing trial day/minute cutoffs remain in force.
+
+Migration 039 adds nullable cancellation/audit timestamps and actor identity without rewriting
+existing financial records. Foreground reads/assignment/settlement and the existing lifecycle worker
+complete due cancellations before renewal logic. A coordinated trial/cancellation-aware backend
+upgrade is needed before this feature is used; deployment is separate from local verification.
+
+Sources: this conversation and explicit trial-payment clarification;
+[client flow](../../apps/api/docs/api/subscriptions-web-handoff.md#cancel-or-remove-a-tenant-subscription);
+[source plan](../../apps/api/docs/superpowers/plans/2026-11-18-tenant-subscriptions-and-call-limits.md#cancellation-extension--2026-11-24).
+
+Verification, 2026-11-24: MySQL-enabled subscription/JWT selection passed all 337 tests, including
+113 MySQL tests, zero failures/errors/skips. The full API suite and bootJar then passed 1186 tests,
+including 229 MySQL tests, with zero failures/errors and one opt-in Vapi live preview test skipped.
+The full run used a temporary 2 GB Test heap through `/tmp/nexcall-subscription-cancellation-test-heap.gradle`
+without changing repository build configuration. Coverage includes scheduled full-term/trial removal,
+blocked trial payment, immediate pending/expired removal, invoice/payment preservation, partial-payment
+protection, scoped/idempotent stale retries, first-request assignment after deadline, Spring-managed
+worker completion, populated-data migration 039 and MySQL cancellation/payment/assignment races.
+Client JSON examples and cancellation DTO fields were checked against source; whitespace checks
+passed. Provider timing, client implementation and deployment remain separate. Source delivery was subsequently authorized by the user; see the delivery record below.
+
+Endpoint naming clarification, 2026-11-24: the user explicitly requested `subscription/unassign`
+instead of the initially proposed cancel route. The controller, client handoff and request tests now
+use POST `/api/subscriptions/customers/{customerId}/subscription/unassign` only. Request/response
+DTOs, cancellation metadata, payment safeguards and effective-date behavior are unchanged.
+
+Verification after the route rename: the focused MVC authorization/request test
+`SubscriptionCancellationTest.shouldExposeAdminUnassignEndpointAndDenyTenantMutation` and bootJar
+passed. No broader behavioral changes were made and the full suite was not rerun for this rename.
+
+### Unassignment delivery — 2026-11-24
+
+At the user's explicit request, SUB-019 was committed on API `master` as `8946260`
+(`feat(subscriptions): support end-of-period tenant unassignment`). It includes migration 039,
+POST `/api/subscriptions/customers/{customerId}/subscription/unassign`, cancellation/payment
+safeguards, current/admin response metadata, tests and the updated client/backend handoffs.
+The parent `main` delivery records SUB-019 and advances the API submodule to this commit.
+No new branch was created; the unrelated web checkout and credential values remain excluded.
+
+Evidence remains the full 1186-passed API suite (229 MySQL tests, one opt-in live preview skipped)
+and bootJar, followed by the focused renamed-endpoint authorization/request test and bootJar.
+Only documentation changed after that final endpoint check. A source push is not confirmation
+of CI success, production migration/deployment or completed client integration.

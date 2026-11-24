@@ -32,6 +32,10 @@ to the user unless the source records that authorization.
 
 ## Status meanings
 
+2026-11-24: [SUB-019](2026-11-18-subscriptions-and-call-limits.md#sub-019-tenant-subscription-cancellation)
+adds current-period cancellation, immediate unpaid removal, preserved trial/payment history and
+fresh assignment after completion; scheduled trial cancellation blocks base payment.
+
 2026-11-23: [SUB-018](2026-11-18-subscriptions-and-call-limits.md#sub-018-package-trials)
 adds one trial per tenant, independent AI/operator trial pools, day expiry awaiting the original
 invoice, immediate fresh paid access on settlement, and migration/rollout requirements.

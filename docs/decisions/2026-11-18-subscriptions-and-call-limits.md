@@ -15,7 +15,10 @@ Subscriptions belong to tenants, with separate AI/operator minute pools shared a
 Platform admins manage commercial operations; benefits supplement existing role, tenant and
 environment restrictions. Keep one current base subscription, purchased term snapshots and
 outstanding-invoice protection against replacement. Publishing freezes commercial terms;
-changed terms require a new package identity. Archiving preserves prior purchases. [SUB-017](#sub-017-package-unpublish-and-retirement) extends
+changed terms originally required a new package identity; [SUB-021](#sub-021-edit-catalogue-packages-independently-of-assigned-subscriptions)
+preserved purchased snapshots; [SUB-022](#sub-022-unpublish-after-all-tenants-request-unassignment)
+now requires every assignment to request removal before catalogue unpublish/edit.
+Archiving preserves prior purchases. [SUB-017](#sub-017-package-unpublish-and-retirement) extends
 package lifecycle and supersedes the source plan's allowance for metadata edits after publication.
 
 Evidence: [package service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/subscriptions/SubscriptionPackageService.java),
@@ -278,7 +281,10 @@ SUB-001 purchased-term immutability and preservation remain in force.
 
 Add platform-admin POST `/api/subscriptions/packages/{id}/unpublish` returning the complete package
 as DRAFT only when it is PUBLISHED and no tenant subscription has ever referenced it, regardless
-of historical status. All package edits require DRAFT; published/archived metadata-only edits also
+of historical status. That historical-reference restriction is superseded by
+[SUB-020](#sub-020-unpublish-after-completed-unassignment), then fully removed by
+[SUB-021](#sub-021-edit-catalogue-packages-independently-of-assigned-subscriptions).
+All package edits require DRAFT; published/archived metadata-only edits also
 reject with 409 `termsLocked`. Publish requires DRAFT and validation. Archive accepts DRAFT or
 PUBLISHED, including assigned packages, preserves configuration, and is idempotent when already
 ARCHIVED. Archived packages have no restore/edit/delete/publish/unpublish flow. Only unused drafts
@@ -323,6 +329,33 @@ The unrelated web checkout and local API `.github/.env` remain outside these com
 Verification remains the 199-test MySQL-enabled subscription/JWT run (42 MySQL tests, zero
 failures/errors/skips) and successful bootJar recorded above; no source changes followed that run.
 A push is source delivery, not confirmation of deployment, CI success or UI integration.
+
+### SUB-020 Unpublish after completed unassignment
+
+**Source/decision date:** 2026-11-24. **Origin:** Explicit user correction: an unassigned
+package must be eligible for unpublish. **Status:** Superseded by
+[SUB-021](#sub-021-edit-catalogue-packages-independently-of-assigned-subscriptions) before delivery.
+The intermediate implementation was verified locally as recorded below.
+
+SUB-017's historical-reference guard counted completed CANCELLED subscriptions, so preserving
+the history required by SUB-019 permanently prevented unpublish. This replaces that part of
+SUB-017: ignore CANCELLED history when checking unpublish eligibility. PENDING, TRIAL, ACTIVE
+and EXPIRED assignments still block unpublish, including cancellation scheduled for a future
+paid/trial deadline. Once cancellation completes for every assignment, PUBLISHED can become
+DRAFT again. Package-row serialization and the locking subscription read remain in place.
+
+Historical subscription snapshots, invoices, payments and trial eligibility remain intact.
+Physical deletion still requires a never-assigned draft. No migration or new endpoint is required.
+The [client handoff](../../apps/api/docs/api/subscriptions-web-handoff.md#package-contract-and-lifecycle)
+and [source plan](../../apps/api/docs/superpowers/plans/2026-11-18-tenant-subscriptions-and-call-limits.md#package-lifecycle-extension--2026-11-23)
+describe the updated rule. Source: the user's report in this conversation.
+
+Verification, 2026-11-24: MySQL-enabled subscription selection passed 332 tests, including 114
+MySQL tests, with no failures/errors/skips; bootJar and whitespace checks passed. Coverage includes
+unpublish/edit after immediate cancellation, preserved invoices/deletion protection, a remaining
+assignment blocking unpublish, and scheduled paid cancellation blocking until completion.
+
+Follow-up: the user explicitly required unpublish/edit while assignments remain, resolved by SUB-021.
 
 ### SUB-018 Package trials
 
@@ -510,3 +543,87 @@ Evidence remains the full 1186-passed API suite (229 MySQL tests, one opt-in liv
 and bootJar, followed by the focused renamed-endpoint authorization/request test and bootJar.
 Only documentation changed after that final endpoint check. A source push is not confirmation
 of CI success, production migration/deployment or completed client integration.
+
+### SUB-021 Edit catalogue packages independently of assigned subscriptions
+
+**Source/decision date:** 2026-11-24. **Origin:** Explicit user requirement to unpublish and
+modify packages even while tenants have trial or paid access, retaining each tenant's own copy
+of in-progress terms. **Status:** Superseded by
+[SUB-022](#sub-022-unpublish-after-all-tenants-request-unassignment) before delivery.
+The intermediate implementation was locally verified as recorded below.
+
+Remove the assignment-reference guard from PUBLISHED-to-DRAFT unpublish. This supersedes
+SUB-017's never-assigned restriction and SUB-020's intermediate completed-unassignment rule.
+Admins can unpublish, edit a DRAFT and republish the same package identity regardless of current
+or historical assignments. Repeated unpublish and unpublish of ARCHIVED packages still reject.
+Physical deletion still requires a never-assigned DRAFT so historical references remain intact.
+
+Each assignment already stores its own complete terms snapshot. Edits to the catalogue do not
+change existing subscription features, prices, allowances, top-up policies, trials, period dates,
+invoices, scheduled unassignment or renewal terms. Settling an existing invoice and renewing an
+existing subscription use that subscription's snapshot, even if the catalogue price ID has been
+removed. There is no automatic migration of existing tenants to revised terms.
+
+DRAFT packages reject new assignments; after republication, new assignments receive the revised
+snapshot. Package-row locking continues to serialize assignment with lifecycle edits, so a
+concurrent assignment either captures the published version before withdrawal or is rejected
+after withdrawal. No migration or endpoint change is required.
+
+The [client contract](../../apps/api/docs/api/subscriptions-web-handoff.md#package-contract-and-lifecycle)
+and [implementation plan](../../apps/api/docs/superpowers/plans/2026-11-18-tenant-subscriptions-and-call-limits.md#package-lifecycle-extension--2026-11-23)
+are updated. Clients must not disable unpublish based on assignment counts or tenant status.
+Source: this conversation. Existing-subscription repricing remains outside this requirement.
+
+Verification, 2026-11-24: MySQL-enabled `test --tests '*Subscription*' bootJar` passed 356
+tests, including 122 MySQL tests, with no failures/errors/skips. Coverage includes all assignment
+statuses, pending invoice settlement and renewal using removed catalogue price IDs, original
+allowance grants, trial limits and scheduled cancellation surviving edits, new assignments using
+the revised configuration, and both concurrent assignment/withdrawal orderings. Diff whitespace
+checks passed. The full application suite, UI flows and deployment were not run for this change.
+
+### SUB-022 Unpublish after all tenants request unassignment
+
+**Source/decision date:** 2026-11-24. **Origin:** Explicit user refinement: unpublish/edit is
+allowed only for packages no longer assigned, even if assigned previously; unassigned tenants
+retain their own terms until the period finishes. **Status:** Implemented and verified locally.
+This supersedes SUB-021's unrestricted unpublish and SUB-020's wait-until-access-expires restriction.
+
+A PUBLISHED package can return to DRAFT only if no subscription referencing it remains both
+non-CANCELLED and without an unassignment request. Any PENDING/TRIAL/ACTIVE/EXPIRED assignment
+without such a request blocks with 409 `termsLocked`. Never-assigned packages remain eligible.
+Completed cancellations and scheduled unassignment do not block. Every tenant must satisfy this
+rule, so removing one assignment does not unblock a package still assigned to another tenant.
+
+Scheduling unassignment still returns the subscription and cancellation metadata through billing
+and current-subscription reads until the existing deadline. Its persisted terms and paid/trial access
+remain in force until then, and renewal stays suppressed. This does not clear the current pointer
+early or allow that tenant to receive another base subscription before completion. The unpublish
+guard interprets the request as removal for catalogue eligibility, independently of remaining access.
+
+After unpublish, admins can edit the DRAFT and republish; future assignments capture revised terms.
+Current scheduled subscriptions keep original allowances, trial limits and cancellation deadlines.
+Historical records remain intact and physical deletion still requires a never-assigned DRAFT.
+The package-row lock and current locking reference read preserve concurrent assignment safety.
+No migration, new endpoint or billing DTO change is required.
+
+The [client handoff](../../apps/api/docs/api/subscriptions-web-handoff.md#package-contract-and-lifecycle)
+and [source plan](../../apps/api/docs/superpowers/plans/2026-11-18-tenant-subscriptions-and-call-limits.md#package-lifecycle-extension--2026-11-23)
+are updated. Source: this conversation. Deployment and client implementation remain separate.
+
+Verification, 2026-11-24: MySQL-enabled subscription tests and bootJar passed: 336 tests,
+including 116 MySQL tests, no failures/errors/skips. Coverage includes blocking remaining
+PENDING/TRIAL/ACTIVE/EXPIRED assignments, completed unassignment with retained history, catalogue
+edits during scheduled paid/trial removal preserving original terms and deadlines, another
+tenant blocking until it also requests removal, and concurrent assignment/withdrawal ordering.
+Whitespace checks passed. Full application tests and deployment were not performed for this refinement.
+
+### Subscription catalogue correction delivery — 2026-11-24
+
+At the user's explicit request, the final SUB-022 behavior and consolidated client handoff were
+committed and pushed to API `master` as `023e7a5`
+(`fix(subscriptions): allow unpublish after all tenants request unassignment`). The parent `main`
+delivery updates the canonical decision records and API submodule pointer to this commit.
+Intermediate SUB-020/021 policies were superseded before delivery and are retained only as decision history.
+Verification is the 336-passed subscription suite above (116 MySQL tests, no skips) and successful
+bootJar; only documentation changed after that run. The unrelated web checkout remains excluded.
+Source delivery does not confirm CI success, deployment or completed client integration.

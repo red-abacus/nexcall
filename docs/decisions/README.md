@@ -32,6 +32,16 @@ to the user unless the source records that authorization.
 
 ## Status meanings
 
+2026-11-24: [SUB-022](2026-11-18-subscriptions-and-call-limits.md#sub-022-unpublish-after-all-tenants-request-unassignment)
+supersedes SUB-021: unpublish requires removal requested or completed for every assignment;
+scheduled paid/trial access continues unchanged and does not block catalogue editing.
+
+2026-11-24: [SUB-021](2026-11-18-subscriptions-and-call-limits.md#sub-021-edit-catalogue-packages-independently-of-assigned-subscriptions)
+initially allowed unpublish/edit with any assignments; superseded by SUB-022's explicit unassignment prerequisite.
+
+2026-11-24: [SUB-020](2026-11-18-subscriptions-and-call-limits.md#sub-020-unpublish-after-completed-unassignment)
+initially allowed unpublish after completed unassignment; its remaining restriction is superseded by SUB-021.
+
 2026-11-24: [SUB-019](2026-11-18-subscriptions-and-call-limits.md#sub-019-tenant-subscription-cancellation)
 adds current-period cancellation, immediate unpaid removal, preserved trial/payment history and
 fresh assignment after completion; scheduled trial cancellation blocks base payment.

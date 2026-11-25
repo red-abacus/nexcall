@@ -56,6 +56,157 @@ verification are recorded under AGENT-003; it is not a current claim that runtim
 warm transfer and authorized implementation, with real calls tested afterward (AGENT-003).
 Post-transfer human-leg billing remains unverified; no inference of its duration is authorized.
 
+### Inbound transfer investigation — 2026-11-24
+
+**Origin:** User report of two failed inbound transfers after successful terminal tests.
+**Status:** Read-only production investigation; inbound transfer remains an unresolved live-test gate.
+No routing fix, provider mutation, test call, commit or deployment was performed in this investigation.
+
+Retrieved Vapi call records, authenticated call logs and SIP captures for
+`01a20d2a-0d52-7ee4-a440-5f1143859cc6` (10:46 UTC) and
+`01a20d5e-8f28-7000-957d-0339d522bcbe` (11:43 UTC). Both invoked transferCall to the
+configured destination, returned “Transfer initiated”, entered warm-transfer PENDING and ended
+about 0.1 seconds later with `customer-ended-call-after-warm-transfer-attempt`. Neither record
+has an operator conversation or completed transfer. The captured SIP dialog shows Vapi-side BYE
+towards Twilio, with no preceding caller-side BYE or REFER in that capture. The endedReason alone
+therefore does not establish that the human caller hung up. Absence of REFER does not establish
+a provider rejection; Vapi-managed numbers may dial rather than send REFER.
+
+These calls use NexCall's Twilio Dial/Sip bridge into a Vapi-managed SIP URI (provider vapi,
+transport sip; no PSTN number or linked trunk credential on that Phone Number resource).
+The current assistant includes the configured warm transfer assistant/fallback; serverMessages
+does not delegate phone-call-control to NexCall. Twilio read-only records show only the original
+inbound call and SIP child, no operator child call and no notification errors. NexCall production
+logs show final usage settlement; they do not explain the provider-side termination.
+
+By comparison, terminal test `01a20956-b28e-7000-b487-9a50d0a16590` on 2026-11-23 used
+an imported Twilio PSTN number and reached warm-transfer ACTIVE, operator acceptance through
+transferSuccessful, and an explicit connected transfer record. That verifies that test's transfer
+connection only, not the inbound SIP route or subsequent human-leg metering.
+
+Conclusion: transfer configuration is present, but successful direct-Twilio tests do not validate
+the deployed inbound SIP-to-PSTN transfer path. Exact Vapi-side termination/outbound-leg cause is
+not exposed in retrieved logs. Next verification must use the actual inbound route and inspect
+Vapi's destination-leg/internal trace; any routing correction must preserve tenant admission,
+call correlation, failed-transfer behavior and usage controls. Changing sipVerb alone is not a
+verified fix, and adding a Twilio REFER handler cannot explain the missing REFER in this capture.
+No new product or billing policy is inferred.
+
+Sources: the above live Vapi artifacts, matching Twilio call/notification reads, current
+TwilioService inbound TwiML and AgentAssistantConfiguration, and Vapi's
+[transfer troubleshooting](https://docs.vapi.ai/phone-calling/in-call-control/transfer-calls/debug-forwarding-drops),
+[warm-transfer guide](https://docs.vapi.ai/calls/assistant-based-warm-transfer) and
+[authenticated artifact retrieval](https://docs.vapi.ai/assistants/retrieve-call-artifacts).
+
+### AGENT-005 Preserve NexCall SIP entry for inbound transfer
+
+**Source/decision date:** 2026-11-24. **Origin:** Explicit user requirement to retain
+`Caller -> Twilio -> NexCall -> Vapi SIP -> agent` and find a transfer correction within it.
+**Status:** Routing constraint accepted; investigation documented. A specific transfer correction
+has not been selected, implemented or live-verified. Native Twilio inbound routing that bypasses
+NexCall's current entry path was proposed earlier in chat and is not the selected direction.
+
+Preserve NexCall's incoming Twilio webhook, admission/tenant checks, campaign schedule, SIP handoff
+and call correlation. Existing human acceptance and localized failed-transfer behavior remain
+requirements; a blind transfer is not an implicitly approved substitute.
+
+Read-only provider inventory found no Vapi BYO SIP trunk credentials and no Twilio Elastic SIP
+trunks. The current managed SIP target has no linked outbound trunk. A candidate is to configure
+an authenticated outbound SIP route for Vapi's operator leg and validate assistant-based warm
+transfer while retaining NexCall's inbound bridge. The source of the immediate hang-up is still
+unconfirmed; missing trunk configuration alone does not prove causality. Compatibility of the
+combined ingress/egress arrangement must be checked before claiming a fix.
+
+An alternative is NexCall/Twilio-controlled transfer, with more orchestration to preserve warm
+operator acceptance and fallback. SIP REFER would need a referUrl handler; adding one alone is
+insufficient evidence because no REFER was present in the failed-call captures. No provider
+resources, production settings or application code were changed for this investigation.
+
+The proposed [SIP transfer validation plan](../../apps/api/docs/superpowers/plans/2026-11-24-inbound-sip-transfer-validation.md)
+records candidates, acceptance criteria and primary references. Outbound calling remains unchanged.
+
+### AGENT-006 Evaluate server-controlled inbound handover
+
+**Source/decision date:** 2026-11-25. **Origin:** User proposal: Vapi notifies NexCall when a
+human transfer is requested, and NexCall uses Twilio to add/bridge the operator while retaining
+the existing inbound route. **Status:** Feasible architectural proposal under discussion;
+no runtime implementation, provider change or live verification. This is not approval to replace
+the accepted conversational warm transfer with a blind or keypad-only flow.
+
+Technical recommendation: evaluate a targeted inbound custom Function tool that sends an
+authenticated HTTPS tool-calls command to NexCall. A second documented option is phone-call-control,
+which delegates forwarding and hang-up together and therefore requires both handlers. SIP media
+does not automatically deliver an application transfer event, and a browser socket is not required.
+The current status/end-report-only webhook does not implement either transfer command path.
+
+NexCall would correlate the original caller leg, hold it, dial the trusted configured operator
+through Twilio, confirm acceptance privately and bridge the parties. Existing inbound calls use
+Dial/Sip, not a conference; a safe transition and durable/idempotent transfer lifecycle are needed
+before conference participant APIs can be used. Preserve tenant boundaries, caller continuity,
+failed-transfer message/hang-up, call limits, history and billing boundaries. Private AI operator
+introduction/acceptance remains an explicit design item, not something a conference supplies by itself.
+
+The updated [validation/design plan](../../apps/api/docs/superpowers/plans/2026-11-24-inbound-sip-transfer-validation.md#server-controlled-transfer-proposal--2026-11-25)
+now recommends evaluating this candidate before adding an outbound SIP trunk solely for transfer.
+The earlier trunk recommendation was a test hypothesis, not an established best fix. Ordinary
+Twilio Programmable Voice dialing/conferencing does not require an Elastic SIP trunk.
+No commercial policy or production rollout is authorized by this feasibility discussion.
+
+### AGENT-007 Prototype NexCall-controlled inbound transfer with keypad acceptance
+
+**Source/decision date:** 2026-11-25. **Origin:** Explicit user agreement to test
+agent -> Vapi transfer request -> NexCall call/destination lookup -> Twilio operator dial/bridge;
+the user explicitly answered **Allow press 1 for this prototype**. **Status:** Implemented locally,
+verification completed as recorded below; no deployment, provider mutation, commit or live call performed.
+
+This temporary test exception permits keypad acceptance after a private introduction. It does not
+replace the accepted production conversational warm transfer or change outbound behavior. Keep
+AGENT-005's incoming route and original NexCall admission checks. The prior SIP-trunk candidate
+is not a prerequisite or the selected implementation of this prototype.
+
+Technical choices: an authenticated inbound-only Function tool, campaign allowlist and default-off
+feature switch; authoritative Vapi/Twilio identity and admitted-route verification; destination from
+applied agent settings; commit durable operation intent before the provider command; unique caller
+and Vapi identities; no automatic replay of uncertain redirects. Use Twilio Dial/Number screening
+with Gather/press-1 rather than introducing a conference. Signed callbacks establish acceptance
+and final bridge outcome; retain localized fallback plus hang-up for rejection/unreachable operator.
+
+The test caps the human bridge at 60 seconds and conservatively within the original call deadline.
+Vapi history/recording and existing AI metering end with the AI leg at Twilio takeover. This prototype
+does not add human-leg recording, invoice/minute policy or UI history integration, and has no new
+reconciler for missing final transfer callbacks. These are explicit production follow-up items.
+The operational [activation and validation plan](../../apps/api/docs/superpowers/plans/2026-11-24-inbound-sip-transfer-validation.md#opt-in-prototype-and-live-validation--2026-11-25)
+documents migration 040, configuration, reprovisioning, state meanings, rollback and live-test gates.
+
+Verification, 2026-11-25: full MySQL-enabled API tests and bootJar passed: 1,237 total tests,
+1,236 passed, no failures/errors, 250 MySQL tests and one opt-in live voice-preview test skipped.
+After the final exact-fallback prompt clarification, 56 focused tests passed (18 MySQL), no skips,
+and bootJar passed again. XML and whitespace checks passed. The first broad run identified a
+missing optional RestClient.Builder bean; the corrected client uses it when available and otherwise
+matches the application's existing manual-builder setup. Real caller continuity, DTMF acceptance,
+operator audio, provider failure behavior and rollback still require the controlled live pilot.
+
+Pilot selection, 2026-11-25: the user explicitly chose campaign **70, AgentulX** using the
+Kubernetes connection. Read-only checks confirmed READY provisioning, IDLE campaign status, active
+tenant/subscription, Romanian language, saved inbound number ending 0630 and transfer destination
+ending 7177. The deployed API remains 023e7a5 without migration 040 or prototype settings. Use only
+campaign ID 70 for opt-in; preserve its existing numbers and record IDLE as the rollback status.
+No campaign activation, provider resource mutation, source delivery or deployment occurred during
+preflight. The validated local JAR is built; a new API build must be deployed before a live pilot.
+
+### Prototype source delivery and deployment authorization — 2026-11-25
+
+The user explicitly requested pushing the changes and performing the live test rather than a
+local-tunnel pilot. API `master` commit `2a48021` (`feat(inbound): add opt-in server-controlled
+transfer prototype`) is pushed. The parent `main` delivery includes the investigation/decision
+records and this API gitlink. The unrelated web checkout is excluded.
+
+The API push triggers its existing Deploy GKE Prod workflow. CI/deployment results and actual
+audio/transfer outcomes are not inferred from the source push. After the new build and migration
+040 are verified healthy, scope the prototype to campaign 70, reprovision AgentulX through the
+normal update flow, and activate it for the controlled pilot. The original IDLE state is recorded
+for rollback. Acceptance for this pilot remains the user's explicit press-1 choice.
+
 If the human is busy/unanswered, play a polite message that colleagues are occupied and someone
 will call back as soon as possible, then end the call. Do not resume normal AI conversation.
 The message itself does not create an automatic callback; follow-up visibility/delivery must be

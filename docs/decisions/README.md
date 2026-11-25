@@ -14,6 +14,12 @@ contracts. Both link back here for current decision status.
   human-leg billing evidence, frontend and deployment remain separate.
   The 2026-11-23 integration with API `master` is recorded in the same document: 939 tests passed,
   one opt-in live test skipped, using a temporary 2 GB test heap after the default-heap run exhausted memory.
+  AGENT-005 preserves NexCall's inbound SIP entry route while investigating failed human transfers;
+  native Twilio inbound routing was not selected. Proposed corrections remain unverified.
+  AGENT-006 records the user's server-controlled transfer proposal and webhook/conference design
+  considerations; private operator acceptance remains unresolved and no runtime change is claimed.
+  AGENT-007 implements the user's explicitly approved press-1 prototype locally, default off and
+  campaign-scoped; live bridging, human-leg recording/billing and production rollout remain separate.
 
 | Record | Scope |
 |---|---|

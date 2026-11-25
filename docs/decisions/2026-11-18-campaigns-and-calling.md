@@ -307,3 +307,14 @@ window require carrier evidence to correct their display.
 
 For CALL-020, verified Twilio Call resource duration also supersedes a provisional callback
 duration in the interaction list. History retains the latest accepted provider version for replay protection.
+
+### CALL-021 Expose recording availability on outbound campaign task rows
+
+**Source and date** — User report and production investigation, 2026-11-25. The user prioritizes future outbound calls.
+The task list requires a flag on each phone entry. The API exposed availability on attempt history
+but omitted it from the task list, and confirmation alone did not trigger its socket refresh.
+
+**Status** — Pushed to API master at `84c96ce` and web master at `f9f9e86`. The local build and 111 focused API tests and 21 focused web tests passed. A new campaign 71 call is the production acceptance check. Derive each phone entry’s `recordingAvailable` from the latest matching
+attempt using the same rule as playback. Publish the existing task update on recording confirmation.
+The campaign Listen action opens recorded playback for a completed attempt and retains live monitoring for an active call SID. Use the existing bounded Vapi checks and CALL-018 storage validation. Historical attempts were left untouched.
+[Client contract](../../apps/api/docs/api/shared-recording-playback-web-handoff.md).

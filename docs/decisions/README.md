@@ -33,13 +33,18 @@ contracts. Both link back here for current decision status.
   checks after removing redundant inclusion annotations passed 236 tests (83 MySQL) and bootJar.
   API master `394cadd` and the web handoff are pushed; its production workflow is queued.
   Deployment verification and client integration remain separate.
-  Human-leg recording/billing and missing callback reconciliation remain open.
+  AGENT-011 implements inbound transferring → inProgress after acceptance → completed on original
+  caller end, using the same interaction and existing after-commit socket hint. The MySQL-enabled
+  build passed 1,351 tests with one optional live test skipped; final focused checks passed 158
+  tests and bootJar. It is local only; rollout and client integration remain separate.
+  Human-leg billing and missing transfer-outcome callback reconciliation remain open. Inbound
+  whole-call recording is implemented locally under CALL-019, with live continuity verification pending.
 
 | Record | Scope |
 |---|---|
 | [CRM and campaign baseline](2026-11-05-crm-backend.md) | Original CRM-001 through CRM-024, with replacement links for changed behavior |
 | [Platform and delivery](2026-11-18-platform-and-delivery.md) | Repository boundaries, monolith, deployment, storage, identity, dates and documentation. [PLAT-009](2026-11-18-platform-and-delivery.md#plat-009-correlate-api-request-and-workflow-logs) records the implemented correlation for API requests, external calls and background work. |
-| [Campaigns and calling](2026-11-18-campaigns-and-calling.md) | Task selection, dispositions, hours, attempts, retries, recordings, scripts and duplication |
+| [Campaigns and calling](2026-11-18-campaigns-and-calling.md) | Task selection, dispositions, hours, attempts, retries, recordings, scripts and duplication. CALL-018 fixes local rejection of valid Vapi Cloudflare R2 recording links; CALL-019 implements opted-in whole-call inbound Twilio capture and disables inbound Vapi audio. Rollout/live verification remain separate. |
 | [Inbound routing and agents](2026-11-18-inbound-routing-and-agents.md) | IN-008/IN-009/IN-010 implemented; direct Twilio onboarding and API-wide preflight removal IN-011/IN-012 implemented and locally verified ([plan](../../apps/api/docs/superpowers/plans/2026-11-18-twilio-number-onboarding.md)); client integration and rollout remain separate |
 | [Number associations and release](2026-11-19-number-associations-and-release.md) | NUM-001 through NUM-005 implemented in the API checkout; role-scoped associations/counts, database release to the pool, restart guards and zero-live local Vapi cleanup; frontend handoff delivered, production rollout separate |
 | [Voice catalog, CRM export and campaign language](2026-11-19-voice-catalog-crm-and-language.md) | CRM-025/CALL-013/NUM-006 implemented locally; CALL-015/016 defaults and language fallbacks verified with 767 tests and bootJar; CALL-017 [API implementation and handoff complete](../../apps/api/docs/api/campaign-voice-selection-web-handoff.md), verified with 826 tests and bootJar after one review/fix pass; VOICE-002 shares private/custom voices, VOICE-003 accepts available previews, VOICE-004 records exact identities and bounded live reads; VOICE-005 implements inbound shared voices (2026-11-22); localization, frontend and deployment remain separate |

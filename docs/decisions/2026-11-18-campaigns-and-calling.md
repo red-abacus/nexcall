@@ -176,3 +176,101 @@ an uncertain response. Reuse a number only when current ownership/reservation ru
 
 Sources: [duplication contract](../../apps/api/docs/api/campaign-replay-web-handoff.md),
 [campaign service](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/services/CampaignService.java).
+
+### CALL-018 Allow Vapi recording links hosted on Cloudflare R2
+
+**Source date:** 2026-11-25. **Status:** Implemented in the local API checkout · Technical choice.
+
+The user reported 503 voiceAgent.recordingProviderUnavailable for inbound interaction playback,
+including agent 70 / interaction 27. Read-only production lookup identified its Vapi call. A private
+provider GET returned 302 with a signed standard Cloudflare R2 bucket/account hostname, while the
+call GET returned 200 and retained recording artifacts. A one-byte media range probe returned
+206 audio/wav, proving that this sample recording exists and is accessible. No call was placed.
+
+CALL-010's shared Vapi playback path accepted only built-in S3/GCS or explicitly configured hosts;
+production has no Vapi recording-storage override. Thus a valid R2 redirect was rejected locally
+and translated into 503. Extend the built-in host validation to standard R2 account endpoints
+(32 hexadecimal account ID), optionally prefixed by a bucket label. Preserve HTTPS, no userinfo,
+no fragment, default/443 port, existing providers/custom hosts and no server-side redirect following.
+Do not expose provider credentials or persist signed URLs. Both inbound and outbound Vapi playback
+use this adapter; the client playback contract is unchanged. No new recordings or database migration
+are needed to make retained recordings eligible for playback after release.
+
+Sources: user report and inspected VapiClient / VoiceRecordingPlayback; sanitized provider response
+metadata and byte-range probe; [Vapi artifact retrieval](https://docs.vapi.ai/assistants/retrieve-call-artifacts),
+[Cloudflare R2 endpoints](https://developers.cloudflare.com/r2/api/tokens/).
+Configuration/client reference: [Vapi handoff](../../apps/api/docs/api/vapi-voice-agent-handoff.md#provisioning-and-staging-checks).
+
+Local regression checks cover signed bucket/account R2 redirects and rejection of insecure schemes,
+lookalike suffixes, userinfo, custom ports, fragments and malformed account hosts. Commit, push,
+deployment and production playback-endpoint verification remain separate from this local correction.
+
+Verification, 2026-11-25: all 31 selected recording and Vapi transport tests passed with zero
+failures/errors/skips; bootJar passed. Diff whitespace checks passed. The earlier whole-API build
+belongs to AGENT-011; it was not repeated or presented as validation of this subsequent one-line
+recording-host correction. No credentials, signed links, audio files or production writes were retained.
+
+
+### CALL-019 Inbound campaign recording uses the original Twilio call
+
+**Decision/source date:** 2026-11-25. **Origin:** Explicit user requirement: record the complete
+inbound conversation using Twilio when campaign recording is enabled; save no new audio when disabled.
+**Status:** Implemented locally; verification and release status are recorded below. No commit,
+push, production profile update, deployment or live audio verification is implied.
+
+Extend CALL-010 for new inbound calls. Snapshot the applied recordCalls flag at original-call
+admission; replay cannot adopt a later campaign flag. Start call-level Twilio recording before
+Vapi SIP, capturing both caller audio tracks through the existing parent-call transfer redirect.
+Disable Vapi audio recording on all newly provisioned inbound profiles in both flag states. Keep
+transcripts, summaries and collected information unchanged. Disabled calls emit no recording start
+and reject recording callbacks; no Vapi fallback is allowed for modern false/pending snapshots.
+Existing audio remains available, including the CALL-018 R2 fix for retained Vapi recordings.
+Configuration changes affect new calls after provisioning reaches READY; ongoing calls retain
+their admission-time choice. Snapshot timing and nullable legacy provenance are technical choices.
+
+Migration 043 adds nullable policy, RecordingSid and status to the route receipt, allowing callback
+arrival before interaction creation. A signed/account-verified callback must match an admitted,
+allowed, recording-enabled parent call in the same campaign. Store IDs/status, never provider media
+URLs. Duplicates do not emit new hints; completed metadata cannot be replaced or downgraded. List
+availability and playback use the same call metadata. Reuse existing authorized recording endpoints,
+Twilio grant/proxy and after-commit scoped socket hints; return one recording on the same interaction.
+Existing inbound reconciliation recovers missing callbacks within its two-hour carrier window with
+at most five recording-list reads per tick; no client-side provider calls or indefinite backfill.
+Provider account/call identity must match, and multiple ambiguous recordings are not selected.
+
+This supersedes the initial AI-only inbound recording limitation retained in AGENT-008/010/011.
+It does not change outbound capture, interaction duration fields, AI billing, or retention/deletion
+policy. Recording duration can exceed the reported AI duration. The caller recording excludes the
+operator's private acceptance screening. Twilio recording/storage charges apply to the captured
+duration; subscription AI minute measurement is retained.
+
+Rollout requires migration 043, existing recording media credentials/signing key, the signed callback
+route and reprovisioning every existing inbound Vapi profile to turn off its old audio capture.
+The checkout does not modify remote assistants. Validate whole-call audio continuity on a live
+successful transfer, plus disabled/no-transfer/refusal/no-answer and legacy playback after deployment.
+A generated Start/Recording instruction is not proof of continuous audio through redirect.
+
+Sources: explicit user direction in this conversation; inspected original caller routing/transfer;
+[Twilio Start/Recording](https://www.twilio.com/docs/voice/twiml/recording),
+[recording resource](https://www.twilio.com/docs/voice/api/recording).
+[Implementation plan](../../apps/api/docs/superpowers/plans/2026-11-12-shared-recording-playback.md#inbound-whole-call-recording--2026-11-25),
+[client handoff](../../apps/api/docs/api/inbound-agent-web-handoff.md#interactions-playback-and-crm),
+[rollout guide](../../apps/api/docs/deployment-gke.md#whole-call-inbound-recording-via-twilio).
+
+Read-only production preflight, 2026-11-25: Twilio recording API credentials are present; the
+NEXCALL_RECORDING_PLAYBACK_SIGNING_KEY environment value is missing or below the existing 32-byte
+minimum. Configure a dedicated shared secret before release playback testing. No key value was
+printed and no production Secret or environment was modified. Inbound playback resolves the media
+path against the configured public API origin, preserving the absolute playbackUrl expected by
+existing inbound clients; request Host headers cannot redirect that URL.
+
+Verification, 2026-11-25: MySQL-enabled full API build passed with 1,373 tests total,
+1,372 passed, zero failures/errors, 300 MySQL tests and one optional live-provider test skipped.
+After the final absolute-URL compatibility adjustment and recovery-budget tests, all 256 selected
+inbound/recording/CRM tests passed (114 MySQL), zero failures/errors/skips; bootJar passed again.
+The checks include signed/tampered/account-mismatched recording callbacks, admission policy replay,
+enabled/disabled TwiML and Vapi provisioning, completed/pending/disabled/legacy playback, idempotence,
+call/campaign scope, before-interaction callback arrival and a shared five-read recovery budget.
+Liquibase XML/includes, local link targets and diff whitespace checks pass. The external 2 GB test
+heap was reused; no project dependency/toolchain/heap change was introduced. Source remains local;
+full-call continuity and disabled capture in live providers remain post-rollout validation.

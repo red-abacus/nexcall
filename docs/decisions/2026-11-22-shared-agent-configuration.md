@@ -714,3 +714,61 @@ The API push queued its existing
 No successful deployment, production migration or live response-field verification is inferred from
 this push. Verify workflow success, application readiness, migration 041 and both history endpoints
 after rollout; web-client integration remains separate.
+
+
+## AGENT-011: Inbound interaction lifecycle through human handover
+
+- **Decision/source date:** 2026-11-25.
+- **Origin:** Explicit user requirement for one interaction that remains active through transfer;
+  technical choice to reuse the existing scoped socket hint and store original-caller state separately.
+- **Status:** Implemented in the local API checkout; verification recorded below.
+  No commit, push, deployment or live verification is implied.
+
+Previously the Vapi AI leg ending completed the interaction, and direct JDBC human-transfer changes
+were not announced through callTaskUpdates. The user requested a transferring state, return to active
+progress after acceptance, and completion only when the caller's conversation ends.
+
+The inbound interaction now follows inProgress → transferring (request/dial/screen) → inProgress
+(operator acceptance) → completed (original caller end). Keep the same interaction and call-detail
+IDs. Failure/refusal announcements remain inProgress until caller hang-up; caller completion wins
+over a later transfer callback. AI/provider attempt status, time, recording and billing remain separate.
+Shared humanTransfer retains AGENT-010's five fields and evidence rules: acceptedAt alone is not
+confirmed bridging; connected still requires the signed final DialBridged evidence for this route.
+
+Additive migration 042 records caller_status on the admitted route receipt. Save active state only
+when unset during transfer intent, then terminal state from the verified original Twilio CallSid /
+CallStatus callback or existing carrier reconciliation. A Vapi/SIP leg end cannot complete an active
+managed caller. Historical transfers without caller tracking retain their saved outcome.
+
+Reuse /user/task-events/callTaskUpdates with its existing three-ID payload. Publish after commit
+for transfer intent, uncertain redirect, acceptance/refusal, final outcome, caller end and interaction
+JSON changes. Coalesce duplicates within a transaction, emit none on rollback, preserve existing
+campaign/tenant/session authorization. Clients refetch interactions and update the same row. Socket
+delivery remains best effort, with refetch on open/reconnect. This extends AGENT-010's initial
+notification behavior without introducing another topic or adding transcript/provider details.
+
+Sources: explicit user request in this conversation, inspected original Twilio StatusCallback and
+Vapi webhook paths, existing after-commit notification collector. Implementation plan:
+[backend lifecycle notes](../../apps/api/docs/superpowers/plans/2026-11-24-inbound-sip-transfer-validation.md#inbound-interaction-lifecycle-and-socket-hints--2026-11-25).
+Client contract: [human-transfer handoff](../../apps/api/docs/api/human-transfer-web-handoff.md#inbound-adaptation).
+
+Open limits: accepted is not a live bridge-confirmation event; missing transfer outcome callbacks
+can still leave humanTransfer unknown/in-progress. EN and live lifecycle/audio checks after rollout
+remain separate. No recording, human billing, outbound route or client source change is included.
+
+
+Verification, 2026-11-25: MySQL-enabled `./gradlew build` passed 1,352 tests total,
+1,351 passed, zero failures/errors, 294 MySQL tests and one optional live-provider test skipped.
+After the last caller-state projection/notification adjustments and expanded real-MySQL late-Vapi
+callback regression, the focused suite passed all 158 tests (90 MySQL), zero failures/errors/skips,
+and bootJar passed again. It includes transfer control/history, commit/rollback notification
+semantics, existing scoped socket contracts and real-migration callback ordering checks.
+The temporary external 2 GB test heap is reused without project toolchain/configuration changes.
+Liquibase XML parsing, diff whitespace and local handoff/decision link checks pass.
+No commit, push, deployment, provider change or live call has been performed for AGENT-011.
+
+
+2026-11-25 follow-up: [CALL-019](2026-11-18-campaigns-and-calling.md#call-019-inbound-campaign-recording-uses-the-original-twilio-call)
+replaces the earlier AI-only inbound recording limitation with opt-in whole-call Twilio capture in
+the local checkout. It leaves the shared handover contract and AI usage measurement unchanged;
+profile refresh, deployment and live continuity verification remain separate.

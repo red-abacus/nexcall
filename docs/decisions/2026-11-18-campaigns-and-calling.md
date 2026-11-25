@@ -338,3 +338,11 @@ After deployment, verify that a caller and operator can hear each other after tr
 **Status** — Pushed to API master in `4e0cd08`. The MySQL-enabled build passed with 1,380 tests passing and one optional live voice-preview test skipped. Supersedes the historical Vapi playback provisions in CALL-018, CALL-019, CALL-021 and CALL-022. Campaign, CRM and inbound history expose playback only for confirmed Twilio recordings. Legacy Vapi flags and artifact URLs no longer make a recording available, and background workers skip Vapi-only attempts. Call history and provider media are retained. This changes playback eligibility without a data purge.
 
 [Client contract](../../apps/api/docs/api/shared-recording-playback-web-handoff.md).
+
+### CALL-024 Outbound summaries follow the selected campaign language
+
+**Date and origin** — 2026-11-25, explicit user request after Romanian campaigns returned English summaries.
+
+**Status** — Pushed to API master in `440152b`. The full MySQL-enabled build passed with 1,382 tests passing and one optional live voice-preview test skipped. Live summary language verification is pending. When reserving an outbound voice-agent attempt, NexCall sets the Vapi post-call summary instructions to the campaign language and supplies the transcript. The existing end-report and reconciliation flows save the result in the attempt’s feedback. Previously saved summaries keep their original text.
+
+[Outbound voice-agent contract](../../apps/api/docs/api/vapi-voice-agent-handoff.md).

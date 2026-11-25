@@ -24,8 +24,9 @@ contracts. Both link back here for current decision status.
   checkout with all-agent inbound eligibility and shared RO/EN spoken handover messages/acceptance.
   Local MySQL-enabled build passed (1,247 passed, one optional live test skipped); final focused
   checks passed 155 tests and bootJar. API master `98730bc` is deployed with successful smoke checks;
-  AgentulX live RO checks confirm spoken DA/audio, unanswered fallback and recognized NU refusal.
-  Outbound, EN, >60-second human duration and other existing profile refreshes remain separate.
+  Live RO checks confirm inbound DA/audio, unanswered fallback and recognized NU refusal, plus
+  outbound DA/messages/audio through normal campaign-71 dispatch. EN, outbound negative cases,
+  >60-second human duration and other existing profile refreshes remain separate.
   Human-leg recording/billing and missing callback reconciliation remain open.
 
 | Record | Scope |

@@ -423,8 +423,8 @@ rollback; rollback has not been applied. Further production scope requires a sep
 following the successful pilot: enable all inbound agents, remove the 60-second human-call cap,
 share caller/failure messages across directions, and instruct spoken YES/NO or DA/NU according
 to campaign language. **Status:** Implemented and locally verified; API source pushed to master as `98730bc`.
-Deployment and Romanian inbound acceptance/no-answer/refusal are verified; outbound, English
-and the extended human-duration check remain pending. Supersedes AGENT-007's pilot scope, keypad acceptance and human cap;
+Deployment, Romanian inbound acceptance/no-answer/refusal and Romanian outbound acceptance/audio
+are verified; English, outbound negative cases and extended human duration remain pending. Supersedes AGENT-007's pilot scope, keypad acceptance and human cap;
 its historical proof and unresolved billing/recording limitations remain valid.
 
 The common message catalogue now drives both routes. Inbound keeps AGENT-005's NexCall SIP entry
@@ -534,3 +534,35 @@ unintended second campaign call or a transfer to the current recipient as the co
 No contact, task or campaign was deleted or modified by the agent. Outbound and English live
 verification, >60-second human audio, voicemail/ambiguous-input cases and remaining production
 follow-ups are not implied by the three successful Romanian inbound checks.
+
+
+### Romanian outbound spoken-transfer result — 2026-11-25
+
+Before activation, the user explicitly reported updating the direct/transfer phone number in
+campaign 71. Read-only checks verified its saved transfer destination now ends **7350**, distinct
+from both existing recipients (task 76 ending 7177 and task 77 ending 9510). The campaign remained
+Romanian and was activated through the normal UI flow. The agent made no task/campaign SQL writes.
+
+NexCall's deployed worker reserved and submitted two actual outbound attempts to Vapi:
+
+- Attempt **226**, task 76, Vapi `01a21294-b114-788e-858f-52e4a4c4cd84`: ENDED with
+  `customer-ended-call`. Provider messages contained endCall, not transferCall. This first call is
+  not counted as a transfer validation. Its task reached DONE normally.
+- Attempt **227**, task 77, Vapi `01a21295-28dd-7000-9639-1d5daecc465f`: the immutable request
+  snapshot contained the shared Romanian caller message, complete DA/NU operator introduction,
+  colleagues-busy/callback fallback, Romanian transfer-assistant transcriber and destination ending
+  7350. The worker logged provider acceptance, Vapi messages contained transferCall, and the call
+  ended with `assistant-forwarded-call`; its task reached DONE. Forwarding alone is not proof of
+  operator connection. In response to the explicit live-test question covering the caller message,
+  operator instructions, spoken DA and audio both ways, the user confirmed **worked as expected**.
+  This user observation supplies the audio/acceptance evidence beyond the forwarding status.
+
+The normal NexCall outbound dispatch, rather than a hand-built terminal call, therefore exercised
+the new shared configuration. Romanian successful handover is live-verified for both incoming SIP/
+Twilio server-controlled routing and native outbound Vapi warm transfer. Inbound no-answer and NU
+refusal are additionally verified above. English, outbound no-answer/refusal, >60-second human
+conversation, ambiguous speech/voicemail and existing follow-ups remain unverified or unresolved;
+no full transfer matrix, new human-leg billing or recordings policy is inferred. Other saved inbound
+assistants still require normal provisioning to adopt the new profile. The implementation-time
+release gate in the API plan is historical; these canonical deployment/live records establish the
+subsequent verification state.

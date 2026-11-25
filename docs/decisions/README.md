@@ -17,10 +17,15 @@ contracts. Both link back here for current decision status.
   AGENT-005 preserves NexCall's inbound SIP entry route while investigating failed human transfers;
   native Twilio inbound routing was not selected. Proposed corrections remain unverified.
   AGENT-006 records the user's server-controlled transfer proposal and webhook/conference design
-  considerations; private operator acceptance remains unresolved and no runtime change is claimed.
+  considerations; its operator-acceptance question is subsequently addressed by AGENT-007/008.
   AGENT-007 implements the user's explicitly approved press-1 prototype and records a successful
   live campaign-70 pilot with provider-confirmed bridging and user-confirmed two-way audio.
-  Other campaigns, spoken AI acceptance and human-leg recording/billing remain separate.
+  AGENT-008 supersedes the pilot's allowlist, keypad acceptance and 60-second human cap in the
+  checkout with all-agent inbound eligibility and shared RO/EN spoken handover messages/acceptance.
+  Local MySQL-enabled build passed (1,247 passed, one optional live test skipped); final focused
+  checks passed 155 tests and bootJar. API master `98730bc` is pushed; deployment is in progress.
+  Provider refresh and live spoken tests remain separate.
+  Human-leg recording/billing and missing callback reconciliation remain open.
 
 | Record | Scope |
 |---|---|

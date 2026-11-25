@@ -81,6 +81,10 @@ Sources: this conversation; current VapiCall and CallUsageService source;
 
 ### AGENT-003 Shared agent catalogue, configuration and Vapi warm transfer
 
+**Subsequent transfer change, 2026-11-25:** [AGENT-008](#agent-008-shared-localized-spoken-handover)
+replaces this record's native inbound transfer behavior and both routes' acceptance wording in the
+checkout. Common agent fields/catalogues and mandatory localized fallback remain in effect.
+
 **Source/approval date:** 2026-11-22. **Origin:** Explicit user implementation authorization and choice
 of the first (Vapi) transfer approach, with live testing after implementation.
 **Status:** Implemented in the API checkout; final verification recorded below; not deployed.
@@ -297,6 +301,10 @@ No commercial policy or production rollout is authorized by this feasibility dis
 
 ### AGENT-007 Prototype NexCall-controlled inbound transfer with keypad acceptance
 
+**Subsequent scope change, 2026-11-25:** [AGENT-008](#agent-008-shared-localized-spoken-handover)
+supersedes the allowlist, keypad-only acceptance and 60-second human cap in the checkout. The
+following pilot deployment and live results remain historical evidence; the new flow is not yet deployed.
+
 **Source/decision date:** 2026-11-25. **Origin:** Explicit user agreement to test
 agent -> Vapi transfer request -> NexCall call/destination lookup -> Twilio operator dial/bridge;
 the user explicitly answered **Allow press 1 for this prototype**. **Status:** Implemented, verified
@@ -407,3 +415,61 @@ Current pilot state: the user-activated campaign remains ACTIVE, only campaign 7
 and the prototype's 60-second human-bridge limit remains configured. No other campaign's transfer
 profile was changed. The original IDLE state and private assistant snapshot remain available for
 rollback; rollback has not been applied. Further production scope requires a separate decision.
+
+
+### AGENT-008 Shared localized spoken handover
+
+**Source/decision date:** 2026-11-25, Europe/Bucharest. **Origin:** Explicit user requirements
+following the successful pilot: enable all inbound agents, remove the 60-second human-call cap,
+share caller/failure messages across directions, and instruct spoken YES/NO or DA/NU according
+to campaign language. **Status:** Implemented and locally verified; API source pushed to master as `98730bc`.
+Deployment and live spoken validation are pending. Supersedes AGENT-007's pilot scope, keypad acceptance and human cap;
+its historical proof and unresolved billing/recording limitations remain valid.
+
+The common message catalogue now drives both routes. Inbound keeps AGENT-005's NexCall SIP entry
+and uses Twilio private speech Gather before bridging. Outbound retains its working Vapi native
+experimental transfer assistant with explicit affirmative-word acceptance/cancellation instructions.
+The operator introduction explains acceptance, refusal and connection after YES/DA. Failed/no-answer
+transfers deliver the same localized colleagues-busy/callback message and end the caller's call.
+No automatic callback job is introduced. Campaign language selects all three messages.
+
+Technical choices: replace the default-off allowlist with a global default-on inbound handover
+switch; preserve resource/admission checks and operation idempotency. Only an entire affirmative
+word in the campaign language permits inbound bridging, with case/punctuation normalization;
+unknown, negative, empty and keypad responses cannot accept. Outbound applies the same rule in
+its Vapi assistant prompt, so model adherence and recognition remain provider-dependent. Twilio
+Romanian speech recognition is documented but this new spoken flow is not established by the
+previous live keypad pilot. Voice timbre/transport and internal timing are not identical across providers.
+
+The human leg can exceed 60 seconds while respecting the original campaign/provider duration
+budget and conservative setup reserve. Existing AI usage ends with its provider leg; no new human-leg
+billing, recording or operator-minute policy is inferred. Missing callback reconciliation remains open.
+There is no new schema or client request field. Existing Vapi inbound assistants require normal
+reprovisioning after deployment; all future outbound call snapshots use the new shared configuration.
+Already-running calls are unchanged. Provider refresh and live testing are tracked separately from implementation.
+
+Sources: user request in this conversation; API [rollout and validation plan](../../apps/api/docs/superpowers/plans/2026-11-24-inbound-sip-transfer-validation.md#shared-spoken-handover--2026-11-25);
+[client handoff](../../apps/api/docs/api/shared-agent-configuration-web-handoff.md#prompt-and-handover-behavior);
+[Twilio speech Gather](https://www.twilio.com/docs/voice/twiml/gather);
+[Vapi transfer configuration](https://docs.vapi.ai/calls/assistant-based-warm-transfer).
+
+
+Verification, 2026-11-25: MySQL-enabled `./gradlew build` passed with 1,248 total tests,
+1,247 passed, zero failures/errors, 254 MySQL tests and the optional `VapiVoiceCatalogLiveTest`
+skipped. After the final greeting/speech-capture adjustment, the focused transfer, assistant composer,
+inbound provisioning and outbound request-factory selection passed all 155 tests (22 MySQL), no
+skips, and `bootJar` passed again. The temporary 2 GB test-heap init script was used; no project
+heap/toolchain/dependency change was introduced. Whitespace checks and new documentation link
+targets passed. These are local payload, HTTP security and persistence checks, not live RO/EN
+recognition, Vapi model compliance or carrier-audio verification. Deployment/provider refresh and
+the controlled spoken-transfer matrix remain outstanding release steps.
+
+
+### Shared spoken handover delivery — 2026-11-25
+
+The user explicitly requested committing/pushing and live tests in both directions. API master
+`98730bc181a8228c1944560897f0a507d6f30574` is pushed; its normal production workflow
+[45605127236](https://github.com/red-abacus/nexcall-api/actions/runs/45605127236) is in progress.
+Parent main includes the decision/handoff references and API pointer; unrelated web changes are excluded.
+Do not infer deployment or successful spoken acceptance from the source push. Verify the deployed
+image/readiness, drain old keypad calls, refresh inbound profiles and test both real call paths.

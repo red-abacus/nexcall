@@ -18,8 +18,9 @@ contracts. Both link back here for current decision status.
   native Twilio inbound routing was not selected. Proposed corrections remain unverified.
   AGENT-006 records the user's server-controlled transfer proposal and webhook/conference design
   considerations; private operator acceptance remains unresolved and no runtime change is claimed.
-  AGENT-007 implements the user's explicitly approved press-1 prototype locally, default off and
-  campaign-scoped; live bridging, human-leg recording/billing and production rollout remain separate.
+  AGENT-007 implements the user's explicitly approved press-1 prototype and records a successful
+  live campaign-70 pilot with provider-confirmed bridging and user-confirmed two-way audio.
+  Other campaigns, spoken AI acceptance and human-leg recording/billing remain separate.
 
 | Record | Scope |
 |---|---|

@@ -300,7 +300,8 @@ No commercial policy or production rollout is authorized by this feasibility dis
 **Source/decision date:** 2026-11-25. **Origin:** Explicit user agreement to test
 agent -> Vapi transfer request -> NexCall call/destination lookup -> Twilio operator dial/bridge;
 the user explicitly answered **Allow press 1 for this prototype**. **Status:** Implemented, verified
-and deployed for a campaign-70-only pilot; source delivery and current pilot status are recorded below.
+and deployed for a campaign-70-only pilot with one successful live keypad-acceptance transfer and
+user-confirmed two-way audio; source delivery and pilot evidence are recorded below.
 
 This temporary test exception permits keypad acceptance after a private introduction. It does not
 replace the accepted production conversational warm transfer or change outbound behavior. Keep
@@ -375,3 +376,34 @@ was asked to activate AgentulX normally in the UI and place the inbound test cal
 the configured operator phone with 1. No live transfer outcome is claimed until a real request,
 provider leg and observed caller/operator result are available. The original IDLE state and
 assistant snapshot remain the rollback reference.
+
+### Live prototype result — 2026-11-25
+
+The user activated AgentulX (70) through the UI and performed two real incoming calls through
+the retained Twilio -> NexCall -> Vapi SIP route. No Elastic SIP trunk or incoming-route change
+was required for this prototype.
+
+- First attempt: Vapi call `01a21258-d37b-7000-b480-48d9aee28efe`, transfer operation
+  `11760209-9284-446e-b6f6-61bb1059f457`. The tool returned HTTP 200, Twilio created/answered
+  operator leg `CA682197dab3401e0743d6615c6a14aa6d`, and screening returned HTTP 200. No acceptance
+  callback was received; the final action recorded FAILED/connected=false and served fallback
+  TwiML. The original caller leg `CAb07feeb16d47b1aea72073680758c4ed` lasted 39 seconds,
+  continuing after Vapi's AI leg ended. No Twilio notification errors were recorded. This does
+  not establish why no digit was received or independently confirm that the caller heard fallback.
+- Second attempt: Vapi call `01a21259-92d6-7000-ad2d-938765777d59`, transfer operation
+  `df942677-c483-42f0-976d-a93da55d8464`. The workflow progressed DIALING -> SCREENING -> ACCEPTED
+  -> CONNECTED. Screening, acceptance and final-action callbacks returned HTTP 200. The stored
+  CONNECTED state requires recorded acceptance, the matching operator SID and DialBridged=true.
+  Caller leg `CA22eb92a63273cddc8a39f260892dbad3` completed after 44 seconds; operator leg
+  `CAe9e52435f48274d16747c13b39d231db` completed after 20 seconds, with no Twilio notification
+  errors. These durations include their respective setup/screening and are not a new billing rule.
+
+The user explicitly reported that the transfer worked, confirmed audio in both directions and
+accepted the approach as a good one. This verifies the server-controlled, press-1 prototype on
+campaign 70. It does not verify the former native Vapi SIP warm transfer, spoken AI acceptance,
+all failure cases, human-leg recording/billing or a general production rollout.
+
+Current pilot state: the user-activated campaign remains ACTIVE, only campaign 70 is allowlisted,
+and the prototype's 60-second human-bridge limit remains configured. No other campaign's transfer
+profile was changed. The original IDLE state and private assistant snapshot remain available for
+rollback; rollback has not been applied. Further production scope requires a separate decision.

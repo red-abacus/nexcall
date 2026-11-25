@@ -38,7 +38,7 @@ contracts. Both link back here for current decision status.
   build passed 1,351 tests with one optional live test skipped; final focused checks passed 158
   tests and bootJar. It is local only; rollout and client integration remain separate.
   Human-leg billing and missing transfer-outcome callback reconciliation remain open. Inbound
-  whole-call recording is implemented locally under CALL-019, with live continuity verification pending.
+  whole-call recording is published under CALL-019, with live continuity verification pending.
 
 | Record | Scope |
 |---|---|

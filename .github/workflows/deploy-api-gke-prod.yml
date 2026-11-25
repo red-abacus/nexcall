@@ -219,6 +219,7 @@ jobs:
 
       - name: Apply application secret
         env:
+          NEXCALL_RECORDING_PLAYBACK_SIGNING_KEY: ${{ secrets.NEXCALL_RECORDING_PLAYBACK_SIGNING_KEY }}
           NEXCALL_JWT_AUTH_TOKEN_SECRET: ${{ secrets.NEXCALL_JWT_AUTH_TOKEN_SECRET }}
           NEXCALL_JWT_CONFIRMATION_ACCOUNT_SECRET: ${{ secrets.NEXCALL_JWT_CONFIRMATION_ACCOUNT_SECRET }}
           NEXCALL_JWT_RESET_PASSWORD_SECRET: ${{ secrets.NEXCALL_JWT_RESET_PASSWORD_SECRET }}
@@ -232,8 +233,13 @@ jobs:
           NEXCALL_TWILIO_ANDROID_PUSH_CREDENTIALS_SID: ${{ secrets.NEXCALL_TWILIO_ANDROID_PUSH_CREDENTIALS_SID }}
           NEXCALL_TWILIO_IOS_PUSH_CREDENTIALS_SID: ${{ secrets.NEXCALL_TWILIO_IOS_PUSH_CREDENTIALS_SID }}
         run: |
+          if (( ${#NEXCALL_RECORDING_PLAYBACK_SIGNING_KEY} < 32 )); then
+            echo "::error::Missing or too short recording playback signing key"
+            exit 1
+          fi
           kubectl create secret generic "$HELM_RELEASE-app-secrets" \
             --namespace "$K8S_NAMESPACE" \
+            --from-literal=recording-playback-signing-key="$NEXCALL_RECORDING_PLAYBACK_SIGNING_KEY" \
             --from-literal=jwt-auth-token-secret="$NEXCALL_JWT_AUTH_TOKEN_SECRET" \
             --from-literal=jwt-confirmation-account-secret="$NEXCALL_JWT_CONFIRMATION_ACCOUNT_SECRET" \
             --from-literal=jwt-reset-password-secret="$NEXCALL_JWT_RESET_PASSWORD_SECRET" \

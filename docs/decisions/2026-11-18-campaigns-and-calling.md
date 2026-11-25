@@ -215,8 +215,7 @@ recording-host correction. No credentials, signed links, audio files or producti
 
 **Decision/source date:** 2026-11-25. **Origin:** Explicit user requirement: record the complete
 inbound conversation using Twilio when campaign recording is enabled; save no new audio when disabled.
-**Status:** Implemented locally; verification and release status are recorded below. No commit,
-push, production profile update, deployment or live audio verification is implied.
+**Status:** Published to API master at `cc7db61`. Production verification is tracked below.
 
 Extend CALL-010 for new inbound calls. Snapshot the applied recordCalls flag at original-call
 admission; replay cannot adopt a later campaign flag. Start call-level Twilio recording before
@@ -274,3 +273,16 @@ call/campaign scope, before-interaction callback arrival and a shared five-read 
 Liquibase XML/includes, local link targets and diff whitespace checks pass. The external 2 GB test
 heap was reused; no project dependency/toolchain/heap change was introduced. Source remains local;
 full-call continuity and disabled capture in live providers remain post-rollout validation.
+
+Production configuration decision, 2026-11-25 (explicit user approval): provision a dedicated
+playback signing key shared by the API replicas. Both production deployment workflows apply the
+same Kubernetes application Secret, so both require the same GitHub Actions secret. The key was
+configured in both repositories and the cluster. Deployment health, runtime key availability, and
+playback of audio across a transfer are separate verification steps. Rotation of the five-call
+reconciliation batch is deferred at the user's request.
+
+Production verification for API `cc7db61`: [deployment and smoke test](https://github.com/red-abacus/nexcall-api/actions/runs/45636474466)
+passed, migrations 042 and 043 completed, readiness reported UP, and the running pod loaded a
+signing key of valid length. The unsigned recording callback returned 401 and an invalid playback
+grant returned 403. These checks cover deployment and access controls. End-to-end call audio still
+requires a live recorded transfer.

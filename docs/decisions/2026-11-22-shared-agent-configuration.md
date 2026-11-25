@@ -774,3 +774,11 @@ the local checkout. It leaves the shared handover contract and AI usage measurem
 profile refresh, deployment and live continuity verification remain separate.
 
 [SUB-023](2026-11-18-subscriptions-and-call-limits.md#sub-023-agent-started-calls-use-ai-minutes-through-caller-hang-up) resolves the human-leg billing decision for newly admitted agent calls.
+
+### AGENT-012 Inbound caller hears the campaign voice before operator dial
+
+**Source and date** — Explicit user decision, 2026-11-25. The Twilio caller announcement introduced a voice change at handover. This replaces the caller-announcement portion of AGENT-008.
+
+**Status** — Pushed to API master in `4e0cd08`. The shared operator introduction ends after the accept-or-decline instruction in both languages. The inbound Vapi function speaks the shared RO/EN caller message with blocking enabled before it calls NexCall. NexCall then redirects the original caller directly to Twilio Dial. Twilio continues screening the operator and delivering the no-answer message. Deploy the API and refresh existing inbound assistant profiles together. Live verification should confirm the caller hears the whole phrase once before the operator rings.
+
+[Vapi blocking tool messages](https://docs.vapi.ai/whats-new/2025/2/4) · [Inbound handover plan](../../apps/api/docs/superpowers/plans/2026-11-24-inbound-sip-transfer-validation.md).

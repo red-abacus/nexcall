@@ -314,7 +314,27 @@ duration in the interaction list. History retains the latest accepted provider v
 The task list requires a flag on each phone entry. The API exposed availability on attempt history
 but omitted it from the task list, and confirmation alone did not trigger its socket refresh.
 
-**Status** — Pushed to API master at `84c96ce` and web master at `f9f9e86`. The local build and 111 focused API tests and 21 focused web tests passed. A new campaign 71 call is the production acceptance check. Derive each phone entry’s `recordingAvailable` from the latest matching
+**Status** — Pushed to API master at `84c96ce` and web master at `f9f9e86`. The local build and 111 focused API tests and 21 focused web tests passed. The user verified playback on campaign 72, attempt 236. The Vapi recording ended at handover, prompting CALL-022. Derive each phone entry’s `recordingAvailable` from the latest matching
 attempt using the same rule as playback. Publish the existing task update on recording confirmation.
 The campaign Listen action opens recorded playback for a completed attempt and retains live monitoring for an active call SID. Use the existing bounded Vapi checks and CALL-018 storage validation. Historical attempts were left untouched.
+[Client contract](../../apps/api/docs/api/shared-recording-playback-web-handoff.md).
+
+### CALL-022 Record the original outbound caller leg in Twilio
+
+**Date and origin** — 2026-11-25, explicit user decision following campaign 72 attempt 236. Playback worked but the Vapi recording omitted the conversation after handover.
+
+**Status** — Pushed to API master in `4e0cd08`. Production acceptance remains open. This supersedes the Vapi capture choice for new outbound voice-agent submissions in CALL-021.
+
+At submission authorization, snapshot the campaign recording choice. Ask Vapi to place the call with Twilio transport recording set to that choice and Vapi audio disabled. For enabled attempts, publish the completed recording for the original Twilio call through the existing campaign and CRM playback endpoints. The initial implementation preserved old Vapi playback, superseded by CALL-023. Migration 046 adds the capture choice and Twilio identifiers. This requires a Vapi phone number backed by the tenant deployment’s own Twilio credentials.
+
+After deployment, verify that a caller and operator can hear each other after transfer and both conversations play in one recording through final hang-up. Verify an opted-out call has no recording.
+
+[Campaign contract](../../apps/api/docs/api/campaign-outbound-policy-web-handoff.md#voice-agent-recording-setting), [Vapi Twilio transport settings](https://docs.vapi.ai/phone-numbers/import-twilio/), [Twilio recording resource](https://www.twilio.com/docs/voice/api/recording).
+
+### CALL-023 Serve only Twilio call recordings
+
+**Date and origin** — 2026-11-25, explicit user decision. Historical Vapi playback is unnecessary.
+
+**Status** — Pushed to API master in `4e0cd08`. The MySQL-enabled build passed with 1,380 tests passing and one optional live voice-preview test skipped. Supersedes the historical Vapi playback provisions in CALL-018, CALL-019, CALL-021 and CALL-022. Campaign, CRM and inbound history expose playback only for confirmed Twilio recordings. Legacy Vapi flags and artifact URLs no longer make a recording available, and background workers skip Vapi-only attempts. Call history and provider media are retained. This changes playback eligibility without a data purge.
+
 [Client contract](../../apps/api/docs/api/shared-recording-playback-web-handoff.md).

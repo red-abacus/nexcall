@@ -23,8 +23,8 @@ contracts. Both link back here for current decision status.
   AGENT-008 supersedes the pilot's allowlist, keypad acceptance and 60-second human cap in the
   checkout with all-agent inbound eligibility and shared RO/EN spoken handover messages/acceptance.
   Local MySQL-enabled build passed (1,247 passed, one optional live test skipped); final focused
-  checks passed 155 tests and bootJar. API master `98730bc` is pushed; deployment is in progress.
-  Provider refresh and live spoken tests remain separate.
+  checks passed 155 tests and bootJar. API master `98730bc` is deployed with successful smoke checks;
+  AgentulX is refreshed for the controlled test. Live spoken tests and other existing profile refreshes remain separate.
   Human-leg recording/billing and missing callback reconciliation remain open.
 
 | Record | Scope |

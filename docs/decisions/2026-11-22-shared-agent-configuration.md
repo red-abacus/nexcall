@@ -423,7 +423,7 @@ rollback; rollback has not been applied. Further production scope requires a sep
 following the successful pilot: enable all inbound agents, remove the 60-second human-call cap,
 share caller/failure messages across directions, and instruct spoken YES/NO or DA/NU according
 to campaign language. **Status:** Implemented and locally verified; API source pushed to master as `98730bc`.
-Deployment and live spoken validation are pending. Supersedes AGENT-007's pilot scope, keypad acceptance and human cap;
+Deployment is verified; live spoken validation is pending. Supersedes AGENT-007's pilot scope, keypad acceptance and human cap;
 its historical proof and unresolved billing/recording limitations remain valid.
 
 The common message catalogue now drives both routes. Inbound keeps AGENT-005's NexCall SIP entry
@@ -473,3 +473,30 @@ The user explicitly requested committing/pushing and live tests in both directio
 Parent main includes the decision/handoff references and API pointer; unrelated web changes are excluded.
 Do not infer deployment or successful spoken acceptance from the source push. Verify the deployed
 image/readiness, drain old keypad calls, refresh inbound profiles and test both real call paths.
+
+
+### Shared spoken handover deployment and test readiness — 2026-11-25
+
+Workflow [45605127236](https://github.com/red-abacus/nexcall-api/actions/runs/45605127236)
+completed successfully, including CI tests, Helm lint/render, image build/push, deployment and
+post-deployment smoke checks. The serving image is API `98730bc181a8228c1944560897f0a507d6f30574`;
+readiness is UP. The obsolete prototype-enabled/campaign-70 environment overrides persisted through
+Helm's merge and were explicitly removed afterward. That cleanup rollout completed with one ready,
+updated replica. The new default-on transfer configuration has no campaign allowlist.
+
+The user selected outbound campaign **71, Test**, in addition to inbound **70, AgentulX**. Read-only
+preflight found no active pilot calls. AgentulX remained ACTIVE/READY in Romanian, but provider
+readback still showed its old pilot profile after the user reported READY. To prepare the selected
+live test, its assistant was backed up privately outside the repository and only model messages,
+model tools and serverMessages were patched through the authorized Vapi API. The payload was built
+using the committed AgentAssistantConfiguration/InboundTransferProperties code from the verified
+local JAR and the agent's applied configuration. Readback verified the new prompt and silent tool
+start; voice, transcriber, first message, artifact plan, call duration and server configuration were
+unchanged. No lifecycle SQL writes or API authentication bypass were used. This is a provider refresh
+for campaign 70, not evidence that other existing assistants have been reprovisioned.
+
+Both selected campaigns currently use Romanian. Outbound 71 has one idle task (76), recipient ending
+7177, transfer destination ending 9510. Inbound uses its saved destination ending 7177. The controlled
+inbound test is requested first: caller on a different phone, private DA acceptance, two-way audio and
+at least 75 seconds of human conversation after connection. Outbound 71 remains idle until the
+inbound call finishes. No spoken-transfer outcome or English live verification is claimed yet.

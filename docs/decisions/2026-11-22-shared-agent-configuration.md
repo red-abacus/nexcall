@@ -566,3 +566,151 @@ no full transfer matrix, new human-leg billing or recordings policy is inferred.
 assistants still require normal provisioning to adopt the new profile. The implementation-time
 release gate in the API plan is historical; these canonical deployment/live records establish the
 subsequent verification state.
+
+
+### AGENT-009 Human transfer outcome on each inbound interaction
+
+**Superseded draft:** [AGENT-010](#agent-010-common-human-transfer-history-contract) replaces the
+unpublished inbound-only raw-state/id/transferred response with the common normalized contract.
+The original draft's verification below is retained as historical evidence, not the final contract.
+
+**Source/decision date:** 2026-11-25, Europe/Bucharest. **Origin:** Explicit user requirement to
+extend the interactions response so clients can display human transfer information for each call.
+**Status:** Implemented and locally verified in the API checkout. Not committed,
+pushed, deployed or integrated into web/mobile. This implements the interaction-read portion of
+the formerly deferred transfer-history integration; actual client rendering remains separate.
+
+`GET /api/inbound/agents/{id}/interactions` adds nullable `humanTransfer` to every item. A matching
+operation supplies its ID, raw status, saved transferNumber, requestedAt, nullable acceptedAt and
+finishedAt, and a transferred boolean. Only persisted CONNECTED (acceptance, matching operator,
+DialBridged=true in the completion callback) sets transferred=true. Pending acceptance, DECLINED,
+FAILED and UNCERTAIN do not establish a successful bridge. A null object means no matching
+NexCall-managed operation; historical provider transferStatus remains meaningful when present.
+This is an additive response change: existing interaction/provider status fields and IDs are retained.
+
+Technical choice: enrich the bounded interactions page in one SQL query using the existing
+inbound_human_transfer table. Correlate within the campaign using the Vapi call ID and/or original
+Twilio caller SID; when both identities are present, both must match. Do not join by campaign alone,
+match contradictory identities, expose internal provider SIDs or fetch a provider per interaction.
+No new entity, migration, transfer callback write or persisted JSON copy is needed. Reads expose
+updates and previously retained transfers without a backfill. Existing campaign authorization and
+cursor pagination remain in force. The destination reflects the request-time snapshot rather than
+subsequent agent edits. Interaction timestamps retain UTC ISO strings.
+
+Clients must use the status as well as transferred: false during ACCEPTED/UNCERTAIN does not
+prove failure. Final bridge confirmation generally arrives when the operator leg finishes, so an
+AI interaction can be completed while its transfer is pending. Missing-final-callback reconciliation,
+more detailed failure reasons, human-leg recordings/billing and a new interaction notification event
+are not introduced. UI integration steps and exact state/null semantics are in the updated
+[client handoff](../../apps/api/docs/api/inbound-agent-web-handoff.md#human-transfer-on-each-interaction).
+The [source plan](../../apps/api/docs/superpowers/plans/2026-11-24-inbound-sip-transfer-validation.md#interaction-level-human-transfer-visibility--2026-11-25)
+tracks this local extension separately from the deployed AGENT-008 transfer behavior.
+
+
+Verification, 2026-11-25: the focused interactions, handover, callback-auth/logging and CRM integration
+selection passed all 113 tests, including 69 MySQL tests, with zero failures/errors/skips; bootJar
+passed. Tests cover all operation states, timestamp/null semantics, acceptance before confirmation,
+callback updates without interaction-JSON writes, Vapi-only/Twilio-only matches, absent/contradictory
+identities, another campaign/call, authorization before database access, stable IDs and cursor pages.
+The initial run exposed mistakes in new fixture parameter binding and schema-name length; those
+fixtures were corrected before the successful rerun. A read-only production query using the same
+join matched existing AgentulX interactions 18–22 to their saved transfer operations, including
+CONNECTED for interaction 20 and FAILED for 21/22. This verifies existing-data correlation, not
+new endpoint deployment. No production writes, provider changes or new live calls were performed.
+Whitespace and new local documentation link targets were checked. The full API suite was not rerun
+for this read-only extension; the executed selection includes the real MySQL/CRM history flow.
+
+
+### AGENT-010 Common human transfer history contract
+
+**Source/decision date:** 2026-11-25, Europe/Bucharest. **Origin:** Explicit user requirement and
+implementation authorization for the same client contract in both directions, despite different
+collectors. The user accepted a normalized status and destination with available nullable timing,
+rather than provider/internal operation details. **Status:** Implemented and locally verified;
+API master `394cadd` is pushed. Deployment is queued, and web/mobile rendering remains separate.
+Supersedes AGENT-009's unpublished response shape; deployed AGENT-008 calling behavior remains
+the verified runtime baseline until the new rollout is confirmed.
+
+Both inbound interaction items and outbound task call-history items expose nullable humanTransfer
+with exactly status, transferNumber, requestedAt, acceptedAt and finishedAt. A shared DTO/enum
+owns the wire shape. The user explicitly requested removing redundant JsonInclude(ALWAYS)
+overrides: retain the existing Jackson null-inclusion default and verify it through contract tests,
+without changing global serialization configuration. Statuses are in-progress, connected, no-answer, busy, voicemail, cancelled,
+failed, completed and unknown. Only connected proves bridging. Completed is retained from Vapi
+without upgrading it to connected. Operator acceptance is still in-progress until bridge confirmation.
+The redundant transferred boolean and raw operation ID/states from the prior draft are removed.
+Null means matching transfer information is unavailable; it is not proof that no transfer occurred.
+
+Timestamps stay nullable UTC ISO values. Inbound uses its recorded operation timestamps; outbound
+artifacts currently provide no separate requested/accepted/finished timestamps, so those values
+remain null. Do not substitute whole-call start/end or derive a billable human duration. The number
+is the request-time/provider destination, not a subsequently edited campaign setting. No provider
+SIDs, transcript or mode is part of the shared client contract. Other call fields, identities,
+permissions, collection wrappers, pagination, recordings and CRM actions remain in place.
+
+Technical implementation: retain inbound campaign/call identity matching and enrich the bounded
+history page on read. Migration 041 adds an outcome column so signed Twilio DialCallStatus callbacks
+can retain no-answer/busy/cancelled, and the explicit NO/NU decision survives final FAILED operation
+state. Ambiguous/missing spoken acceptance remains generic failed. Old rows lacking the reason
+remain failed; voicemail is never inferred for inbound. Existing raw operation state remains usable
+for control/audit. Completed callbacks remain idempotent.
+
+For outbound, extend Vapi observations with normalized artifact/forwarding evidence and store a
+minimal JSON summary on each VoiceAgentAttempt. Existing call/org/provider-number/recipient
+validation precedes updates. A forwarded-call end reason alone yields unknown, not connected.
+Artifact connected was observed on the actual campaign-71 test call and is distinct confirmation
+from that end reason. Missing/late/weaker observations do not erase confirmed connection evidence.
+Read destination fallback from the immutable request; malformed legacy metadata cannot prevent
+processing the provider's call outcome. API history reads do not call providers.
+
+A separate metadata check lane uses existing Vapi credentials and worker cadence. It handles
+ended calls from the last 30 days, at most five per tick, with row-locked claims before provider
+GETs and 20-second retry spacing for at most two minutes from first claim. Private checked/next
+markers added in migration 041 prevent duplicate concurrent claims and keep this independent of
+submission/disposition queues and older replicas. Known results, no transfer and missing provider
+calls stop checks; exhausted unknown outcomes remain unknown. New authenticated observations can
+still add stronger evidence later. This is a technical, bounded history-refresh choice, not a new
+calling/billing policy or promise of reconstructing expired provider data.
+
+Deliver one [web handoff](../../apps/api/docs/api/human-transfer-web-handoff.md), linked from the
+inbound and shared-agent handoffs, containing only endpoints, response fields, examples, display,
+refresh and integration verification rules. [Backend rollout notes](../../apps/api/docs/deployment-gke.md#human-transfer-history-contract)
+and the [source plan](../../apps/api/docs/superpowers/plans/2026-11-24-inbound-sip-transfer-validation.md#interaction-level-human-transfer-visibility--2026-11-25)
+keep migration, collection mechanics and runtime status separate from the client instructions.
+
+Sources: explicit user agreement/implementation request in this conversation; existing inbound
+operation/callback implementation; private read-only Vapi GET of the campaign-71 test artifact;
+[Vapi TransferArtifact](https://github.com/VapiAI/server-sdk-typescript/blob/main/src/api/types/TransferArtifact.ts),
+[Vapi status values](https://github.com/VapiAI/server-sdk-typescript/blob/main/src/api/types/TransferArtifactStatus.ts),
+[Vapi phone transfer events](https://docs.vapi.ai/server-url/events#phone-and-sip-transfers).
+
+
+Verification, 2026-11-25: MySQL-enabled `./gradlew build` passed with 1,333 total tests,
+1,332 passed, zero failures/errors, 286 MySQL tests and one optional live voice-catalog test skipped.
+After the user's requested removal of JsonInclude overrides, the focused transfer, worker, history,
+callback-security and persistence selection passed all 236 tests (83 MySQL), zero failures/errors/
+skips, and bootJar passed again. The temporary 2 GB test-heap init script was reused; no project
+heap/toolchain/dependency change was made. Contract tests confirm exact five-field JSON and explicit
+nulls using default serialization. Real MySQL tests confirm migration and JSON persistence, while
+Spring history tests confirm per-attempt exposure, scope validation and stale-update protection.
+New metadata checks are tested for claim timing, retry exhaustion, active/old/missing calls and
+operation without dispatch; new inbound tests retain busy/no-answer/cancellation and distinguish
+literal NO/NU from ambiguous/missing acceptance. XML parsing, whitespace and local link targets pass.
+No new live calls, production migration, provider configuration changes or deployment were performed
+for AGENT-010. End-to-end observation of the new response fields remains a post-deployment check.
+
+
+### Common human-transfer history source delivery — 2026-11-25
+
+The user explicitly requested committing/pushing the API on master and updating/pushing the parent
+on main with documentation and the submodule pointer. API commit
+[394caddfd5acd9b7dda2c53dd0e69c29d21e9a44](https://github.com/red-abacus/nexcall-api/commit/394caddfd5acd9b7dda2c53dd0e69c29d21e9a44)
+contains the verified shared contract, collectors, migration 041, regression checks and web handoff.
+Parent main records the decision history and points to that API commit. Unrelated web changes are
+excluded, and no feature branch was created.
+
+The API push queued its existing
+[production workflow 45619130718](https://github.com/red-abacus/nexcall-api/actions/runs/45619130718).
+No successful deployment, production migration or live response-field verification is inferred from
+this push. Verify workflow success, application readiness, migration 041 and both history endpoints
+after rollout; web-client integration remains separate.

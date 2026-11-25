@@ -27,6 +27,12 @@ contracts. Both link back here for current decision status.
   Live RO checks confirm inbound DA/audio, unanswered fallback and recognized NU refusal, plus
   outbound DA/messages/audio through normal campaign-71 dispatch. EN, outbound negative cases,
   >60-second human duration and other existing profile refreshes remain separate.
+  AGENT-009's initial inbound-only draft is superseded by AGENT-010: both histories share five
+  fields and normalized lowercase statuses, with retained inbound outcomes and persisted Vapi
+  evidence. Full MySQL-enabled build passed (1,332 passed, one optional live test skipped); final
+  checks after removing redundant inclusion annotations passed 236 tests (83 MySQL) and bootJar.
+  API master `394cadd` and the web handoff are pushed; its production workflow is queued.
+  Deployment verification and client integration remain separate.
   Human-leg recording/billing and missing callback reconciliation remain open.
 
 | Record | Scope |

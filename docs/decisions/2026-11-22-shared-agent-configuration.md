@@ -423,7 +423,8 @@ rollback; rollback has not been applied. Further production scope requires a sep
 following the successful pilot: enable all inbound agents, remove the 60-second human-call cap,
 share caller/failure messages across directions, and instruct spoken YES/NO or DA/NU according
 to campaign language. **Status:** Implemented and locally verified; API source pushed to master as `98730bc`.
-Deployment is verified; live spoken validation is pending. Supersedes AGENT-007's pilot scope, keypad acceptance and human cap;
+Deployment and Romanian inbound acceptance/no-answer/refusal are verified; outbound, English
+and the extended human-duration check remain pending. Supersedes AGENT-007's pilot scope, keypad acceptance and human cap;
 its historical proof and unresolved billing/recording limitations remain valid.
 
 The common message catalogue now drives both routes. Inbound keeps AGENT-005's NexCall SIP entry
@@ -500,3 +501,36 @@ Both selected campaigns currently use Romanian. Outbound 71 has one idle task (7
 inbound test is requested first: caller on a different phone, private DA acceptance, two-way audio and
 at least 75 seconds of human conversation after connection. Outbound 71 remains idle until the
 inbound call finishes. No spoken-transfer outcome or English live verification is claimed yet.
+
+
+### Romanian inbound spoken-transfer results — 2026-11-25
+
+Three real AgentulX (70) calls exercised the deployed NexCall -> Twilio bridge with the shared
+Romanian messages. The user supplied audio/experience confirmation; provider/application observations
+are distinguished below. Outbound campaign 71 remained idle during these inbound checks.
+
+- Acceptance: Vapi `01a2128a-c5b3-7000-bba4-e74b5b797cf6`, operation
+  `f0c6d0b8-6dc9-4ca3-9bb4-f430d3aaabab`, caller `CA3a99600840210dd4b604c32b89afbaea`,
+  operator `CA8751f5f951fd9ca98c38ffdf87e85642`. Acceptance was stored and the final callback
+  recorded CONNECTED (matching operator and DialBridged=true). The user confirmed the Romanian
+  introduction, spoken DA acceptance and audio worked. Only approximately 9 seconds elapsed between
+  accepted_at and finished_at: this does not verify human conversation beyond 60 seconds.
+- Unanswered operator: Vapi `01a2128c-cd3b-7000-92f2-07a1e9d70b3a`, operation
+  `846b93c0-7e15-4990-92a5-2bab249c4ae6`, caller `CAb056ff67cca972909631dbf33842c342`.
+  No acceptance was stored; final state was FAILED/connected=false. The user explicitly confirmed
+  the expected Romanian colleagues-busy/callback message followed by call termination.
+- Spoken refusal: Vapi `01a2128f-464c-7000-b853-8f3c5507cac5`, operation
+  `b6fbc0e3-975f-44eb-9d7c-0a881a380536`, caller `CA2f98418ee14bcc0ce32c043b2ca83e4c`,
+  operator `CA5e3c1cb38a17d522632b41cdcea99d8f`. Twilio events showed HTTP 200 screening,
+  acceptance and completion callbacks; the acceptance request's speech_result was exactly `nu`.
+  The operator response contained Hangup, and the caller completion response contained Romanian
+  fallback plus Hangup. No acceptance was stored and final state was FAILED/connected=false.
+  The user confirmed no operator/caller connection, correct fallback audio and termination.
+
+Subsequent outbound preflight found a second live idle contact in campaign 71: task 77 ending
+9510, in addition to task 76 ending 7177. Its saved transfer destination still ends 9510. The user
+was asked to select the intended caller/operator pair before activation, to avoid treating an
+unintended second campaign call or a transfer to the current recipient as the controlled test.
+No contact, task or campaign was deleted or modified by the agent. Outbound and English live
+verification, >60-second human audio, voicemail/ambiguous-input cases and remaining production
+follow-ups are not implied by the three successful Romanian inbound checks.

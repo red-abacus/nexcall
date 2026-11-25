@@ -286,3 +286,24 @@ passed, migrations 042 and 043 completed, readiness reported UP, and the running
 signing key of valid length. The unsigned recording callback returned 401 and an invalid playback
 grant returned 403. These checks cover deployment and access controls. End-to-end call audio still
 requires a live recorded transfer.
+
+### CALL-020 Inbound interaction duration follows the original caller
+
+**Source date and origin** — 2026-11-25, user report for agent 70, interaction 28.
+The user verified that one recording included the AI and human conversation. Twilio reported
+88 seconds for the original call and recording. The interaction displayed 27 seconds from the AI leg.
+This verifies full-call playback for this transfer.
+
+**Status** — Implemented locally. This supersedes CALL-019’s earlier duration behavior for the
+top-level inbound interaction. Use Twilio’s terminal original-call duration from the existing
+callback or reconciliation, independent of recording and transfer outcome. Keep the existing
+provider duration as a fallback where carrier evidence is missing. The nested attempt and
+subscription metering keep their existing meanings. Historical calls outside the reconciliation
+window require carrier evidence to correct their display.
+
+[Inbound client handoff](../../apps/api/docs/api/inbound-agent-web-handoff.md#interactions-playback-and-crm).
+
+[SUB-023](2026-11-18-subscriptions-and-call-limits.md#sub-023-agent-started-calls-use-ai-minutes-through-caller-hang-up) resolves the human-leg billing decision for newly admitted agent calls.
+
+For CALL-020, verified Twilio Call resource duration also supersedes a provisional callback
+duration in the interaction list. History retains the latest accepted provider version for replay protection.

@@ -772,3 +772,5 @@ No commit, push, deployment, provider change or live call has been performed for
 replaces the earlier AI-only inbound recording limitation with opt-in whole-call Twilio capture in
 the local checkout. It leaves the shared handover contract and AI usage measurement unchanged;
 profile refresh, deployment and live continuity verification remain separate.
+
+[SUB-023](2026-11-18-subscriptions-and-call-limits.md#sub-023-agent-started-calls-use-ai-minutes-through-caller-hang-up) resolves the human-leg billing decision for newly admitted agent calls.

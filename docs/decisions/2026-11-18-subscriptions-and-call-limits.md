@@ -627,3 +627,31 @@ Intermediate SUB-020/021 policies were superseded before delivery and are retain
 Verification is the 336-passed subscription suite above (116 MySQL tests, no skips) and successful
 bootJar; only documentation changed after that run. The unrelated web checkout remains excluded.
 Source delivery does not confirm CI success, deployment or completed client integration.
+
+### SUB-023 Agent-started calls use AI minutes through caller hang-up
+
+**Decision and source** — Explicit user instruction, 2026-11-25, following the live recording and
+duration check on inbound interaction 28. A call that starts with an agent uses the AI pool for its
+entire connected duration, including human handover, even when the tenant has zero operator minutes.
+
+**Status** — Implemented in the local checkout for newly admitted inbound and outbound agent calls.
+The original Twilio caller leg supplies the terminal duration. The session stays in its admission
+period and resource pool. A verified parent completion settles the total once. When carrier identity
+or final duration is missing, reconciliation can retrieve it. A known undialed cancellation settles
+at zero. The separate operator leg and recording are unnecessary for this calculation.
+Existing sessions retain their admission-time policy. No historical debit is authorized.
+
+This supersedes the former AI-end boundary for agent calls in SUB-005 and resolves the open human-leg
+billing question in AGENT-011. CALL-020 describes the interaction display. Live validation of the
+new billing behavior remains pending.
+[Client contract](../../apps/api/docs/api/subscriptions-web-handoff.md#agent-calls-and-human-transfers).
+
+Within SUB-023, a signed completion callback supplies a provisional duration. The worker checks
+recent provisionally settled caller sessions within the two-hour recovery window. A dated Twilio
+Call resource supersedes callback evidence; a newer verified version can correct usage up or down.
+Apply the difference in the original allowance period. Equal or older verified versions and
+subsequent callback replays cannot undo the correction. An agent report can bind a previously
+unknown caller SID while billing is awaiting usage and make the session due for reconciliation.
+
+API master commit `f7e148d` includes both corrections. The full MySQL-enabled build passed
+1,388 tests with one optional live test skipped. Deployment and live balance verification are separate.

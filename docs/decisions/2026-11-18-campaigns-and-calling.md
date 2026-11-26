@@ -360,3 +360,46 @@ The API combines the existing transfer evidence and original caller session on r
 The user also required one subscription eligibility check at campaign creation, activation and each new call. Duplication creates a campaign and uses the same check. This supersedes the calling exemption in SUB-011. AI campaigns require AI credit, operator campaigns require operator credit, and inbound requires the inbound feature. Only new calls reserve a concurrent slot. Human handover remains part of the existing call. See the [API handoff](../../apps/api/docs/api/shared-agent-configuration-web-handoff.md#campaign-lifecycle-validation).
 
 The MySQL-enabled API build passed with 1,403 tests passing and one optional live provider test skipped. Production verification is pending.
+
+### DASH-001 Collections dashboard reports both call directions
+
+**2026-11-26 · Explicit user decision · Pushed to API master in `eefc8d6`.** Collections campaigns can receive calls back from previous recipients. Count a callback from a recipient as inbound, and every actual NexCall dial as outbound, including a dial returning a missed callback. Selecting a Collections campaign shows both sections with the default all-directions filter, including a section with zero calls. This amends the single-direction campaign rule in the November 25 dashboard handoff. The web rollout is pending.
+
+Source: user clarification on 2026-11-26 and the [dashboard implementation plan](../../apps/api/docs/superpowers/plans/2026-11-26-dashboard-overview.md). DASH-003 settles the campaign counts, rate eligibility and duration rules. DASH-007 records the query strategy.
+
+### DASH-002 Preserve deleted campaigns in dashboard reporting
+
+**2026-11-26 · Explicit user requirement · Pushed to API master in `eefc8d6`.** Campaign deletion must preserve the visibility of historical calls in the dashboard. A deleted campaign with matching calls in the selected period contributes its calls and counts once under its configured direction (clarified in DASH-003), even if its deletion date is unknown. Tenant authorization and other report filters still apply. DASH-005 settles the zero-call counting rule.
+
+Source: user clarification on deleted campaigns with call history on 2026-11-26. The [dashboard plan](../../apps/api/docs/superpowers/plans/2026-11-26-dashboard-overview.md) describes the reporting picker, which returns the deletion flag.
+
+### DASH-003 Dashboard campaign counts, connection rates and duration
+
+**2026-11-26 · Explicit user clarification · Pushed to API master in `eefc8d6`.** Count a Collections campaign once as outbound. Its incoming attempts still contribute to inbound activity, connection rate, duration and outcomes. All attributable incoming callbacks enter the rate denominator, including missed and logged-only calls on closed tasks. Six connections from ten incoming callbacks yield 60%. Outbound voicemail is eligible and unconnected; the earlier exclusion of confirmed wrong or invalid numbers from eligibility was superseded by DASH-004. Carrier completion alone does not establish a human answer.
+
+Use subscription timing for transferred calls. Operator ringing and screening during the AI session count toward AI time. Confirmed connected human time counts toward operator time. Sum the two intervals once for the call duration. This supersedes the handoff's exclusion of handoff ringing and screening and the earlier proposal to count Collections campaigns in both sections. Source: user clarification of 2026-11-26, the [dashboard plan](../../apps/api/docs/superpowers/plans/2026-11-26-dashboard-overview.md) and the [subscription contract](../../apps/api/docs/api/subscriptions-web-handoff.md#agent-calls-and-human-transfers).
+
+### DASH-004 All outbound attempts enter the rate; start-day attribution and tenant scope
+
+**2026-11-26 · Explicit user decision · Pushed to API master in `eefc8d6`.** Every actual outbound attempt enters the connection-rate denominator, including invalid and wrong numbers. Preserve their outcome count. This replaces the denominator exclusion in DASH-003 and the November 25 handoff. Attribution uses the UTC date when the call started, including when final evidence arrives on a later date. Tenant dashboards and campaign selectors are restricted to the authenticated tenant; only the NexCall platform administrator can view all tenants and filter by tenant.
+
+Source: user clarification on 2026-11-26. DASH-005 supersedes the earlier interpretation that a wrong-party conversation should map to INVALID_NUMBER.
+
+### DASH-005 Distinct wrong-party outcomes and campaign counts
+
+**2026-11-26 · Explicit user decision · Pushed to API master in `eefc8d6`.** Keep WRONG_NUMBER and INVALID_NUMBER as separate reporting outcomes. An actual conversation with the wrong person counts as connected. An invalid-number attempt counts as unconnected. Both enter the denominator.
+
+Count each matching non-deleted campaign once even with no calls in the period, provided it existed by period end. Count a deleted campaign once only when it has matching call activity in the period. Its deletion date is unnecessary. Source: user correction on 2026-11-26 and the [dashboard implementation plan](../../apps/api/docs/superpowers/plans/2026-11-26-dashboard-overview.md).
+
+### DASH-006 Missing duration in dashboard averages
+
+**2026-11-26 · Explicit user decision · Pushed to API master in `eefc8d6`.** Keep recorded attempts with missing duration in call counts and applicable connection and outcome metrics. Average only finished connected calls with reliable duration. An empty duration sample returns null. The user requested a web integration handoff after API implementation, to be based on verified behavior. See the [dashboard plan](../../apps/api/docs/superpowers/plans/2026-11-26-dashboard-overview.md#web-handoff-after-api-verification).
+
+
+### DASH-007 Dashboard reads and picker
+
+**2026-11-26 · Technical choice · Pushed to API master in `eefc8d6`.** The reporting module reads the customer database for the overview and the tenant-scoped campaign picker. Each request reads one consistent snapshot after the existing reporting authorization check. Late evidence updates the figures on the next request for the original UTC start day. The client can use the catalog to select inbound agents and deleted campaigns with history.
+
+New Collections callback records capture the execution mode at receipt. Explicit invalid-destination evidence on verified failed outbound carrier callbacks is retained for reporting. Historical rows use available evidence, so generic carrier failures can remain FAILED or UNKNOWN. Deployment and live comparison are pending. See the [web handoff](../../apps/api/docs/api/dashboard-overview-web-handoff.md) and the [implementation plan](../../apps/api/docs/superpowers/plans/2026-11-26-dashboard-overview.md).
+
+The full local MySQL-enabled API build passed with 1,413 tests passing and one optional live provider test skipped. The HTTP tests cover the agreed ten-callback example, tenant scoping the cross-midnight transfer case and carrier completion without conversation evidence.

@@ -784,3 +784,26 @@ profile refresh, deployment and live continuity verification remain separate.
 **Status** — Pushed to API master in `4e0cd08`. The shared operator introduction ends after the accept-or-decline instruction in both languages. The inbound Vapi function speaks the shared RO/EN caller message with blocking enabled before it calls NexCall. NexCall then redirects the original caller directly to Twilio Dial. Twilio continues screening the operator and delivering the no-answer message. Deploy the API and refresh existing inbound assistant profiles together. Live verification should confirm the caller hears the whole phrase once before the operator rings.
 
 [Vapi blocking tool messages](https://docs.vapi.ai/whats-new/2025/2/4) · [Inbound handover plan](../../apps/api/docs/superpowers/plans/2026-11-24-inbound-sip-transfer-validation.md).
+
+### AGENT-013 Scripted destinations for inbound routing
+
+**Source and date** — Explicit user request, 2026-11-26, for the inbound routing pilot. Vapi selects
+the payment or appointment destination from the campaign script and passes the number to NexCall.
+NexCall uses it directly for the Twilio dial without finding a contact.
+
+**Status** — Implemented in the API checkout. The full MySQL-enabled Gradle run and bootJar passed (1420 passed, 1 skipped), including all 34 inbound transfer MySQL cases with mocked providers. API master `67b94a8` reached production on 2026-11-26 with successful deployment and post-deployment smoke checks. Campaign 77 was subsequently provisioned and activated for the live pilot. [Deployment run](https://github.com/red-abacus/nexcall-api/actions/runs/45843039362)
+
+**Technical choices and consequences** — Extend AGENT-008 and AGENT-012 with an optional
+`destinationNumber` on the existing tool. For inbound ROUTING only, derive the allowed numbers
+from contiguous international numbers in the applied campaign instructions. Only include intended
+destinations in that format. Omitted arguments retain general handover. Signed call correlation,
+duplicate protection, operator screening, history and caller-leg handling continue on the same path.
+Saved assistants need reprovisioning. On 2026-11-26, production campaign 77 dialed the scripted payment destination (ending 7350), distinct from its general handover number. The transfer reached Twilio screening and ended with persisted outcome `cancelled` and no acceptance timestamp. This verifies payment destination selection and dialing. A subsequent campaign 77 transfer to the appointment number (ending 7177) recorded CONNECTED/connected, confirming acceptance and bridging. Audio quality and how often the agent selects the intended route across varied requests remain unverified. See the [API contract and pilot instructions](../../apps/api/docs/api/shared-agent-configuration-web-handoff.md#prompt-and-handover-behavior).
+
+### AGENT-014 Creation-time CALL presets and campaign-authored instructions
+
+**Explicit user decision, 2026-11-26. Pushed to API master in `58d85ca`.** Seed 16 immutable shared CALL presets in the database across four purposes, Romanian and English, and inbound and outbound directions. Remove industry from inbound and outbound campaign configuration and from all preset records, validation and selection filters. At creation the client copies the preset into editable campaign fields. The saved campaign owns its instructions independently of the preset.
+
+This replaces the automatic foundation, industry, purpose and direction prompt paragraphs for CALL agents. Use the resolved campaign guidance, handover condition and selected information to collect. Send the opening separately. The rollout requires no campaign data migration or legacy prompt branch. Previously provisioned assistants can retain their provider configuration until normally reprovisioned.
+
+Source: the supplied presets backend contract and the user's clarifications on 2026-11-26. The user superseded the handoff’s industry requirement and confirmed AGENT-013 scripted destinations for inbound ROUTING. The Romanian and English inbound routing presets should illustrate separate billing and appointment destinations and ask for clarification when the caller’s intent is unclear. The user edits the copied script or supplies the actual numbers. Retain the general transfer number for ordinary human handover. The initial implementation resolved inbound static fields. The user superseded that approach on 2026-11-26. Inbound presets use manual editing markers. Users replace or remove them in the copied script before saving. NexCall derives allowed destinations directly from final instructions. Only outbound supports per-recipient substitution. Migration 049 installs the catalog. The [preset integration handoff](../../apps/api/docs/api/settings-scripts-web-handoff.md) documents the paged picker response and creation payloads. Local MySQL tests verified repeatable installation of exactly 16 presets and persistence of the editable routing configuration through provisioning. The full API build passed (1,338 tests passed, one live voice-preview test skipped). Deployment and client integration are pending.

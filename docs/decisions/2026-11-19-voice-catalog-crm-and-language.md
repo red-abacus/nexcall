@@ -151,7 +151,7 @@ existing batch requests. Validate names, phones and email; retain tenant/role, C
 active-call checks. Create or link the contact and import history transactionally without
 rewriting original task facts. Reuse an existing matching contact within the authorized tenant,
 preserve its profile and import the new history with source-identity deduplication on retries.
-Generic inbound task editing remains forbidden.
+Generic inbound task editing remains forbidden. [CRM-026](#crm-026-inbound-interaction-contact-and-timeline-status) extends this flow to automatically matched agent interactions and exposes timeline status.
 
 The optional reviewed contact is supported for exactly one task. Successful reuse is returned in
 `savedTaskIds`; multiple matched profiles fail with `pages.crm.errors.ambiguousContactPhones`.
@@ -432,3 +432,17 @@ Full verification 2026-11-19: 755 tests passed with zero failures/errors/skips, 
 No commits, branches, data reset, live provider pilot, client edits or deployment are part of this delivery.
 
 [Implementation report, verification and technical rulings](../../apps/api/docs/superpowers/reports/2026-11-19-inbound-workflow-completion.md).
+
+### CRM-026 Inbound interaction contact and timeline status
+
+**2026-11-26 · Explicit user requirement · Pushed to API master (`e15d63e`) and web master (`216af2f`).** An inbound interaction must
+identify its CRM contact when one exists and tell the client whether that call appears in the
+contact's timeline. This extends CRM-025. Campaign 70 exposed the distinction when a manual
+export linked the caller task but the interaction was missing from CRM updates.
+
+The API matches a unique active phone contact within the tenant, preserves reviewed links and
+uses the individual call details ID for each timeline entry. The list projects current contact
+and timeline state independently. Repeating Save to CRM can import existing finished calls.
+See the [client contract](../../apps/api/docs/api/inbound-agent-web-handoff.md#interactions-playback-and-crm).
+
+The MySQL-enabled API build passed with 1,405 tests passing and one optional provider test skipped. The inbound web package built and all 80 inbound tests passed. Live verification on campaign 70 is pending.

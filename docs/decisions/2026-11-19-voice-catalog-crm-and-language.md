@@ -442,7 +442,24 @@ export linked the caller task but the interaction was missing from CRM updates.
 
 The API matches a unique active phone contact within the tenant, preserves reviewed links and
 uses the individual call details ID for each timeline entry. The list projects current contact
-and timeline state independently. Repeating Save to CRM can import existing finished calls.
+and timeline state independently. The original implementation imported existing finished calls for the caller. CRM-027 supersedes that export behavior.
 See the [client contract](../../apps/api/docs/api/inbound-agent-web-handoff.md#interactions-playback-and-crm).
 
 The MySQL-enabled API build passed with 1,405 tests passing and one optional provider test skipped. The inbound web package built and all 80 inbound tests passed. Live verification on campaign 70 is pending.
+
+### CRM-027 Explicit per-interaction inbound CRM export
+
+**2026-11-26 · Explicit user requirement · Pushed to API master (`355a3d7`) and web master (`bb8ca51`). Local verification passed with 1,406 API tests passing, one skipped, and all 80 inbound web tests passing. Live verification is pending.**
+An inbound caller can have multiple interactions on a single campaign task. Saving a row must add
+only the selected interaction to the CRM timeline. This supersedes CRM-025/026 for inbound agent
+history export. Automatic contact matching and existing timeline entries are preserved.
+
+The API requires one task ID and the selected interaction ID. The shared contact link identifies
+the caller; only an explicit save creates a timeline entry for a finished interaction. Provider
+corrections can refresh an existing entry. The web client sends the selected row’s numeric interaction ID in the save request. Source: user correction on 2026-11-26 and the
+[API handoff](../../apps/api/docs/api/inbound-agent-web-handoff.md#interactions-playback-and-crm).
+
+CRM playback uses the same Twilio recording reference as the inbound interaction. The technical
+choice is to resolve the permitted inbound routing receipt at read time for the CRM flags and
+playback endpoint. Existing saved entries therefore pick up a completed recording on refresh.
+Source: same-day report that both CRM playback flags were false for a playable inbound call.

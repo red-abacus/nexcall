@@ -159,6 +159,8 @@ an explicit enforcement recovery toggle; disabled enforcement still measures usa
 current implementation, replacing the draft idea that assignment and enforcement activation
 would always be separate steps. Pilot rollout and provider checks remain operational work.
 
+The calling exemption was superseded on 2026-11-26 by [CALL-026](2026-11-18-campaigns-and-calling.md#call-026-pause-a-campaign-before-changing-its-settings-or-deleting-it).
+
 Evidence: [assignment and enforcement](../../apps/api/src/main/java/com/nexcall/monolith/modules/customers/subscriptions/SubscriptionBillingService.java),
 [rollout guide](../../apps/api/docs/deployment-gke.md#subscriptions-and-call-limits).
 

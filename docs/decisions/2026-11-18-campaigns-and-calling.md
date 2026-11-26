@@ -352,3 +352,11 @@ After deployment, verify that a caller and operator can hear each other after tr
 **2026-11-25 · Explicit user decision · Implemented in checkout.** Campaign 73 showed Done at the assistant handoff and reported the assistant's 81 seconds. The whole-caller session recorded 104 seconds. Outbound campaign screens must show Transferring during handoff, In progress once connected to the operator, and the final status after the original caller hangs up. The duration comes from that caller leg regardless of recording availability, following CALL-020. Audio length can differ from connected duration.
 
 The API combines the existing transfer evidence and original caller session on read. Transfer and caller updates invalidate the task over its existing socket channel. The scheduler retains its own task disposition and the provider retains its assistant-leg timestamps. Delivery of intermediate states depends on when provider evidence arrives. See the [API handoff](../../apps/api/docs/api/human-transfer-web-handoff.md). Production verification of this change is pending.
+
+### CALL-026 Pause a campaign before changing its settings or deleting it
+
+**2026-11-26 · Explicit user decision · Pushed to API master in `c71fbdd`.** Platform and tenant administrators must pause active campaigns before changing campaign configuration or deleting them. Inbound activation intent also protects settings while provisioning is pending. The user confirmed that recipient management remains available on an active campaign. Call processing, pause and force-stop remain available. The rule also covers campaign script assignments, per-campaign user settings and profile photos.
+
+The user also required one subscription eligibility check at campaign creation, activation and each new call. Duplication creates a campaign and uses the same check. This supersedes the calling exemption in SUB-011. AI campaigns require AI credit, operator campaigns require operator credit, and inbound requires the inbound feature. Only new calls reserve a concurrent slot. Human handover remains part of the existing call. See the [API handoff](../../apps/api/docs/api/shared-agent-configuration-web-handoff.md#campaign-lifecycle-validation).
+
+The MySQL-enabled API build passed with 1,403 tests passing and one optional live provider test skipped. Production verification is pending.

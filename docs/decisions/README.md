@@ -6,6 +6,8 @@ contracts. Both link back here for current decision status.
 
 ## Records
 
+- [SETTINGS-001 usage and Settings table contracts](2026-11-26-settings-usage.md) records signed usage balances, inventory and classifier paging, and preset ownership.
+
 - [AGENT-014 creation-time CALL presets](2026-11-22-shared-agent-configuration.md#agent-014-creation-time-call-presets-and-campaign-authored-instructions) records the 16 industry-independent templates, removal of industry from campaigns and presets, and editable inbound routing examples.
 - [AGENT-013 inbound routing pilot](2026-11-22-shared-agent-configuration.md#agent-013-scripted-destinations-for-inbound-routing) allows Vapi to select a scripted phone number for Twilio. Production rollout and smoke checks passed for API `67b94a8`. Campaign 77 reached payment screening and the transfer ended cancelled. A subsequent appointment transfer connected.
 

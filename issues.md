@@ -93,7 +93,7 @@ The failing operation is saving the update produced after an inbound interaction
 
 ## 3. Backend usage must return used and remaining seconds for all usable allowances
 
-- **Status:** TODO
+- **Status:** Pushed to API master in `d427409`. Web integration and live verification pending.
 - **Reported:** 2026-11-24
 - **Section:** Usage
 - **Owner:** Backend
@@ -102,7 +102,7 @@ The failing operation is saving the update produced after an inbound interaction
 
 **Acceptance:** Every usable allowance is identifiable in the usage response and includes both used seconds and remaining seconds, including zero values.
 
-**Verification:** Pending; this entry records requested work, not completed functionality.
+**Implementation:** The subscription usage object now exposes signed AI and operator remaining seconds alongside their used seconds. The API regression suite covers live usage, zero and overrun balances. [Web integration contract](apps/api/docs/api/settings-usage-web-handoff.md).
 
 ## 4. Agent setup statuses
 
@@ -110,23 +110,23 @@ The failing operation is saving the update produced after an inbound interaction
 
 ## 6. Backend Twilio number list needs paging, sorting, and filtering
 
-- **Status:** TODO
+- **Status:** Pushed to API master in `d427409`. Web integration and live verification pending.
 - **Reported:** 2026-11-18
 - **Section:** Settings → Twilio Numbers
 - **Owner:** Backend, with UI integration after the API contract is available
 - **Endpoint:** `GET /api/settings/twilio-numbers`
 
-**Current gap:** Pagination is not implemented. The previous standalone pagination row marked OK in `verify.md` was incorrect and has been removed.
+**Original gap:** Pagination was missing. The previous standalone pagination row marked OK in `verify.md` was incorrect and has been removed.
 
 **Required work:** Support server-side paging, sorting, and filtering for the phone-number list. Define supported query parameters and return page metadata, including the total matching count, so the UI can navigate results correctly. Apply filtering and sorting before paging and preserve tenant scoping and permissions.
 
-**Acceptance:** The list can request different pages and page sizes, sort supported columns consistently, and filter across the full matching inventory rather than only the loaded page. Integrate the UI table with the agreed API contract. Exact sort fields, filters, and parameter names remain to be defined.
+**Acceptance:** The list can request different pages and page sizes, sort supported columns consistently, and filter across the full matching inventory rather than only the loaded page. Integrate the UI table with the agreed API contract.
 
-**Verification:** Pending. The combined feature is tracked as **List Twilio Numbers (with paging, sorting, filtering)** in `verify.md`.
+**Implementation:** The settings endpoint supports scoped database paging, sorting and inventory search. Existing unpaged requests keep their array response. The web team owns table integration. [Web integration contract](apps/api/docs/api/settings-usage-web-handoff.md).
 
 ## 9. Industry Classifiers needs pagination, sorting, and filtering
 
-- **Status:** TODO
+- **Status:** Pushed to API master in `d427409`. Web integration and live verification pending.
 - **Reported:** 2026-11-19
 - **Section:** Settings → Industry Classifiers
 - **Owner:** Backend and frontend
@@ -143,13 +143,13 @@ The failing operation is saving the update produced after an inbound interaction
 - Define the backend query parameters and response metadata, and wire the table controls to that contract.
 - Reset to the first page when the standard, filters, or sorting changes; retain the selected criteria while navigating pages.
 
-**Acceptance:** Users can browse, sort, and filter both standards with accurate totals and consistent results across pages. Empty results and request failures are clearly presented. Exact filter controls and API parameter names remain to be agreed.
+**Acceptance:** Users can browse, sort, and filter both standards with accurate totals and consistent results across pages. Empty results and request failures are clearly presented.
 
-**Verification:** Pending; this entry records requested work, not completed functionality.
+**Implementation:** CAEN and NAICS support server-side code/description search, stable sorting and matching totals. The web team owns table integration. [Web integration contract](apps/api/docs/api/settings-usage-web-handoff.md).
 
 ## 10. Preset visibility and filtering must respect tenant ownership
 
-- **Status:** TODO
+- **Status:** Pushed to API master in `d427409`. Web integration and live verification pending.
 - **Reported:** 2026-11-19
 - **Section:** Settings → Presets
 - **Owner:** Backend and frontend
@@ -166,6 +166,6 @@ The failing operation is saving the update produced after an inbound interaction
 
 **Acceptance:** An admin can see presets from multiple tenants, distinguish their owners, filter to one tenant, and clear that filter. A tenant user sees only their own tenant's presets and cannot access another tenant's presets by modifying a request or navigating directly to a record.
 
-**Scope note:** Cross-tenant visibility does not by itself define new admin edit/archive permissions. Reconcile existing shared/platform presets with the requested own-tenant-only visibility before implementation; do not silently retain an exception.
+**Scope note:** Cross-tenant visibility does not by itself define new admin edit/archive permissions. The agreed tenant exception covers the 16 read-only built-ins.
 
-**Verification:** Pending; this entry records requested work, not completed functionality.
+**Implementation:** Platform Settings exposes preset ownership and exact-tenant filtering. Tenant administrators can access their own presets and the 16 built-ins. Ownerless custom presets are platform-only. The web team owns the ownership filter and labels. [Web integration contract](apps/api/docs/api/settings-usage-web-handoff.md).

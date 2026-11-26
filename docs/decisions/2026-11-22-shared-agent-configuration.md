@@ -641,6 +641,8 @@ without upgrading it to connected. Operator acceptance is still in-progress unti
 The redundant transferred boolean and raw operation ID/states from the prior draft are removed.
 Null means matching transfer information is unavailable; it is not proof that no transfer occurred.
 
+Update, 2026-11-25: [SUB-024](2026-11-18-subscriptions-and-call-limits.md#sub-024-split-transferred-calls-between-ai-and-operator-allowances) establishes split billing and permits a verified outbound screening timestamp in `acceptedAt`. The original contract below records the earlier evidence.
+
 Timestamps stay nullable UTC ISO values. Inbound uses its recorded operation timestamps; outbound
 artifacts currently provide no separate requested/accepted/finished timestamps, so those values
 remain null. Do not substitute whole-call start/end or derive a billable human duration. The number

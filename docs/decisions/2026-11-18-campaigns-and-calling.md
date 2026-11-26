@@ -346,3 +346,9 @@ After deployment, verify that a caller and operator can hear each other after tr
 **Status** — Pushed to API master in `440152b`. The full MySQL-enabled build passed with 1,382 tests passing and one optional live voice-preview test skipped. Live summary language verification is pending. When reserving an outbound voice-agent attempt, NexCall sets the Vapi post-call summary instructions to the campaign language and supplies the transcript. The existing end-report and reconciliation flows save the result in the attempt’s feedback. Previously saved summaries keep their original text.
 
 [Outbound voice-agent contract](../../apps/api/docs/api/vapi-voice-agent-handoff.md).
+
+### CALL-025 Outbound transfers follow the original caller through hang-up
+
+**2026-11-25 · Explicit user decision · Implemented in checkout.** Campaign 73 showed Done at the assistant handoff and reported the assistant's 81 seconds. The whole-caller session recorded 104 seconds. Outbound campaign screens must show Transferring during handoff, In progress once connected to the operator, and the final status after the original caller hangs up. The duration comes from that caller leg regardless of recording availability, following CALL-020. Audio length can differ from connected duration.
+
+The API combines the existing transfer evidence and original caller session on read. Transfer and caller updates invalidate the task over its existing socket channel. The scheduler retains its own task disposition and the provider retains its assistant-leg timestamps. Delivery of intermediate states depends on when provider evidence arrives. See the [API handoff](../../apps/api/docs/api/human-transfer-web-handoff.md). Production verification of this change is pending.

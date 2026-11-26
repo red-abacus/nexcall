@@ -630,6 +630,8 @@ Source delivery does not confirm CI success, deployment or completed client inte
 
 ### SUB-023 Agent-started calls use AI minutes through caller hang-up
 
+Superseded for newly admitted calls by [SUB-024](#sub-024-split-transferred-calls-between-ai-and-operator-allowances).
+
 **Decision and source** — Explicit user instruction, 2026-11-25, following the live recording and
 duration check on inbound interaction 28. A call that starts with an agent uses the AI pool for its
 entire connected duration, including human handover, even when the tenant has zero operator minutes.
@@ -655,3 +657,11 @@ unknown caller SID while billing is awaiting usage and make the session due for 
 
 API master commit `f7e148d` includes both corrections. The full MySQL-enabled build passed
 1,388 tests with one optional live test skipped. Deployment and live balance verification are separate.
+
+### SUB-024 Split transferred calls between AI and operator allowances
+
+**2026-11-25 · Explicit user instruction · Implemented in checkout, pending deployment.** This replaces [SUB-023](#sub-023-agent-started-calls-use-ai-minutes-through-caller-hang-up) for the applicable calls. Inbound and outbound AI conversations consume AI seconds. Time actually connected to a human consumes operator seconds and can take the operator balance below zero. An unanswered or declined transfer has zero human conversation time. The displayed total duration still follows the original caller through hang-up under CALL-020 and CALL-025.
+
+Source: the user's follow-up after campaign 73. That outbound call has a connected Vapi transfer artifact with a timestamped successful screening result. Inbound NexCall records spoken acceptance and receives Twilio bridge confirmation. The user confirmed that ringing and screening consume AI seconds. Transfers on trials may overdraw the operator balance until the trial deadline. The split applies only to calls admitted under the new policy. Calls already in flight and settled historical usage retain SUB-023. Implementation uses the original session, subscription period and concurrent slot. Late bridge or carrier evidence adjusts the two ledger entries by their differences. See the [client contract](../../apps/api/docs/api/subscriptions-web-handoff.md#agent-calls-and-human-transfers).
+
+Delivery, 2026-11-26: API master `3c98aab` and web master `7975134` include SUB-024 and CALL-025. The local API build passed with 1,396 tests passed and one skipped. The web build and 69 subscription tests passed. Two unrelated web tests (cold-calling table columns and the breadcrumb translation pipe) also failed on the unmodified web revision. Live transfer and billing verification is pending.

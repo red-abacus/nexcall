@@ -361,6 +361,12 @@ The user also required one subscription eligibility check at campaign creation, 
 
 The MySQL-enabled API build passed with 1,403 tests passing and one optional live provider test skipped. Production verification is pending.
 
+### CALL-027 Remove untouched To Do tasks from outbound campaigns
+
+**2026-11-27 · Explicit user requirement · Pushed to API master in `82bceba`.** An administrator may remove an outbound recipient while its task is To Do and has no call history. This extends CALL-026 recipient management during an active campaign. The rule covers individual and bulk removals in Collections and Cold Calling.
+
+**Technical choices.** Derive eligibility from task status and persisted call evidence. Count callbacks and pending submissions. Exclude outbound submissions explicitly cancelled before dial or confirmed never created. Check the selection under the existing campaign and task locks before soft deletion. Expose `removable` in the task list for the web client. See the [integration contract](../../apps/api/docs/api/call-task-updates-and-cold-calling-guide-web-handoff.md#remove-a-recipient-from-an-outbound-campaign). Deployment and client integration are pending.
+
 ### DASH-001 Collections dashboard reports both call directions
 
 **2026-11-26 · Explicit user decision · Pushed to API master in `eefc8d6`.** Collections campaigns can receive calls back from previous recipients. Count a callback from a recipient as inbound, and every actual NexCall dial as outbound, including a dial returning a missed callback. Selecting a Collections campaign shows both sections with the default all-directions filter, including a section with zero calls. This amends the single-direction campaign rule in the November 25 dashboard handoff. The web rollout is pending.

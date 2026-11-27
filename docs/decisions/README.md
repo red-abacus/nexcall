@@ -6,6 +6,8 @@ contracts. Both link back here for current decision status.
 
 ## Records
 
+- [SUB-025 forced unassignment and tenant history](2026-11-18-subscriptions-and-call-limits.md#sub-025-forced-unassignment-and-tenant-history) documents immediate access removal and administrator-visible assignment events.
+
 - [SETTINGS-001 usage and Settings table contracts](2026-11-26-settings-usage.md) records signed usage balances, inventory and classifier paging, and preset ownership.
 
 - [AGENT-014 creation-time CALL presets](2026-11-22-shared-agent-configuration.md#agent-014-creation-time-call-presets-and-campaign-authored-instructions) records the 16 industry-independent templates, removal of industry from campaigns and presets, and editable inbound routing examples.

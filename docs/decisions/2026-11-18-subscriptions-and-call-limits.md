@@ -463,6 +463,8 @@ Push delivery is not confirmation of CI success, deployment or client integratio
 
 ### SUB-019 Tenant subscription cancellation
 
+[SUB-025](#sub-025-forced-unassignment-and-tenant-history) adds an explicit immediate option for paid and trial assignments.
+
 **Source/decision date:** 2026-11-24. **Origin:** Explicit user requirement to remove a tenant's
 package at the end of its current paid/trial period, or immediately when no period is active while
 cancelling the unpaid invoice; new assignment then follows the normal flow. Explicit clarification:
@@ -667,3 +669,13 @@ API master commit `f7e148d` includes both corrections. The full MySQL-enabled bu
 Source: the user's follow-up after campaign 73. That outbound call has a connected Vapi transfer artifact with a timestamped successful screening result. Inbound NexCall records spoken acceptance and receives Twilio bridge confirmation. The user confirmed that ringing and screening consume AI seconds. Transfers on trials may overdraw the operator balance until the trial deadline. The split applies only to calls admitted under the new policy. Calls already in flight and settled historical usage retain SUB-023. Implementation uses the original session, subscription period and concurrent slot. Late bridge or carrier evidence adjusts the two ledger entries by their differences. See the [client contract](../../apps/api/docs/api/subscriptions-web-handoff.md#agent-calls-and-human-transfers).
 
 Delivery, 2026-11-26: API master `3c98aab` and web master `7975134` include SUB-024 and CALL-025. The local API build passed with 1,396 tests passed and one skipped. The web build and 69 subscription tests passed. Two unrelated web tests (cold-calling table columns and the breadcrumb translation pipe) also failed on the unmodified web revision. Live transfer and billing verification is pending.
+
+### SUB-025 Forced unassignment and tenant history
+
+**2026-11-27 · Explicit user decision · Implemented in the API checkout.** The platform administrator can end a tenant assignment immediately, including an active paid term, a trial or an assignment already scheduled to end under SUB-019. After commit, new call admission requires another eligible assignment. Existing calls keep their admission limits and usage period. Paid invoices and payments stay on record with no automatic refund or prorated credit. SUB-019's unpaid invoice and partial-payment rules still apply.
+
+Record assignment, unassignment request and unassignment completion from rollout onward. Both unassignment events distinguish forced and ordinary actions. Only platform administrators may read the tenant history. No historical reconstruction is required.
+
+Source: the user's November 27 subscription requirements and follow-up on paid balances, call admission, event scope and access. Technical choices include an optional request reason, tenant-specific cursor pagination and recording each event in the same transaction as its change. [Client contract](../../apps/api/docs/api/subscriptions-web-handoff.md#tenant-subscription-history).
+
+API master includes SUB-025 in `64bd87e`. The MySQL-enabled build passed locally with 1,346 tests passed and one skipped. Production verification is pending.
